@@ -1,0 +1,412 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Admin dark inputs */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.5);
+}
+
+select option {
+  background: #0d0d18;
+  color: rgba(255,255,255,0.8);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Base Styles — Global resets, fonts, scrollbar, selection
+   ═══════════════════════════════════════════════════════════════ */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: #f7f6f3;
+    color: #1f1f1f;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Scrollbar — thin, minimal, blends with warm background */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #d4d4d4;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #b0b0b0;
+  }
+
+  /* Selection — accent-tinted highlight */
+  ::selection {
+    background: rgba(90, 122, 90, 0.15);
+    color: #1f1f1f;
+  }
+
+  /* Smooth transitions for all interactive elements */
+  button, a, input, textarea, select {
+    transition: all 0.2s ease;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Component Styles — Reusable visual patterns
+   ═══════════════════════════════════════════════════════════════ */
+@layer components {
+
+  /* Subtle grid background (from UI project) */
+  .grid-bg {
+    background-image:
+      linear-gradient(rgba(0, 0, 0, 0.018) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 0, 0, 0.018) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  /* Card hover lift effect (from UI project) */
+  .card-hover {
+    transition: transform 0.3s cubic-bezier(0.22, 0.61, 0.36, 1),
+                box-shadow 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  .card-hover:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.06);
+  }
+
+  /* Search bar glow on focus */
+  .search-glow:focus-within {
+    box-shadow: 0 0 0 3px rgba(90, 122, 90, 0.12),
+                0 8px 32px rgba(0, 0, 0, 0.06);
+  }
+
+  /* Doodle underline decoration (for hero headings) */
+  .doodle-underline {
+    position: relative;
+    display: inline-block;
+  }
+  .doodle-underline::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    width: 100%;
+    height: 8px;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='8'%3E%3Cpath d='M0 6 Q30 0 60 6 Q90 12 120 6' stroke='%235a7a5a' stroke-width='2' fill='none' opacity='0.35'/%3E%3C/svg%3E") repeat-x;
+    background-size: 120px 8px;
+  }
+
+  /* Doodle elements */
+  .doodle-arrow,
+  .doodle-scribble,
+  .doodle-star {
+    opacity: 0.06;
+    pointer-events: none;
+  }
+
+  /* Glass morphism for navbar */
+  .glass {
+    background-color: rgba(247, 246, 243, 0.82);
+    backdrop-filter: blur(20px) saturate(1.8);
+    -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  }
+
+  /* Pill navigation link */
+  .nav-pill {
+    padding: 7px 18px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: #6b6b6b;
+    border-radius: 9999px;
+    border: 1.2px solid #e5e5e5;
+    transition: all 0.25s ease;
+    white-space: nowrap;
+    letter-spacing: 0.01em;
+    line-height: 1;
+  }
+  .nav-pill:hover {
+    color: #1f1f1f;
+    background-color: rgba(0, 0, 0, 0.04);
+    border-color: #6b6b6b;
+    transform: translateY(-1px);
+  }
+  .nav-pill.active {
+    color: #5a7a5a;
+    background-color: rgba(90, 122, 90, 0.08);
+    border-color: #5a7a5a;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Responsive Utilities
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Hide scrollbars everywhere (used on horizontal scroll strips) */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Safe area insets for mobile notch / home indicator */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Prevent text overflow on mobile cards */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Responsive font scaling below 360px (very small phones) */
+@media (max-width: 360px) {
+  html {
+    font-size: 14px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Word Cloud — Interactive query visualization
+   ═══════════════════════════════════════════════════════════════ */
+.word-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 12px;
+  padding: 16px 8px;
+  min-height: 80px;
+}
+
+.word-cloud-item {
+  display: inline-block;
+  padding: 4px 10px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  line-height: 1.3;
+  border-radius: 8px;
+  transition: all 0.25s cubic-bezier(0.22, 0.61, 0.36, 1);
+  transform: rotate(var(--rotation, 0deg));
+  white-space: nowrap;
+}
+
+.word-cloud-item:hover {
+  background: rgba(90, 122, 90, 0.1);
+  transform: rotate(0deg) scale(1.15);
+  opacity: 1 !important;
+}
+
+.word-cloud-item:active {
+  transform: rotate(0deg) scale(0.95);
+}
+
+.word-cloud-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Comment Fire/Ice Voting — Visual effects
+   ═══════════════════════════════════════════════════════════════ */
+.comment-vote-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: none;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  line-height: 1;
+}
+
+.comment-vote-btn:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.comment-vote-btn.upvoted {
+  background: rgba(255, 100, 0, 0.08);
+  border-color: rgba(255, 100, 0, 0.2);
+}
+
+.comment-vote-btn.downvoted {
+  background: rgba(100, 149, 237, 0.08);
+  border-color: rgba(100, 149, 237, 0.2);
+}
+
+.comment-vote-btn:active {
+  transform: scale(0.92);
+}
+
+/* Upvote emoji animations */
+.emoji-upvote {
+  display: inline-block;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.comment-vote-btn:hover .emoji-upvote {
+  transform: scale(1.2) rotate(-10deg);
+}
+.comment-vote-btn.upvoted .emoji-upvote {
+  animation: fire-flicker 1.5s infinite alternate ease-in-out;
+}
+
+@keyframes fire-flicker {
+  0% { transform: scale(1) rotate(-5deg); filter: brightness(1) drop-shadow(0 0 2px rgba(255,100,0,0.4)); }
+  50% { transform: scale(1.15) rotate(5deg); filter: brightness(1.1) drop-shadow(0 0 5px rgba(255,100,0,0.6)); }
+  100% { transform: scale(1) rotate(-2deg); filter: brightness(0.95) drop-shadow(0 0 3px rgba(255,100,0,0.5)); }
+}
+
+/* Downvote emoji animations */
+.emoji-downvote {
+  display: inline-block;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.comment-vote-btn:hover .emoji-downvote {
+  transform: translateY(2px) rotate(15deg);
+}
+.comment-vote-btn.downvoted .emoji-downvote {
+  animation: shiver 0.4s infinite linear;
+}
+
+@keyframes shiver {
+  0% { transform: translate(1px, 1px) rotate(0deg); }
+  25% { transform: translate(-1px, -2px) rotate(-1deg); filter: grayscale(0.5); }
+  50% { transform: translate(-2px, 0px) rotate(1deg); filter: grayscale(0.8); }
+  75% { transform: translate(2px, 2px) rotate(0deg); filter: grayscale(0.5); }
+  100% { transform: translate(1px, -1px) rotate(0deg); }
+}
+
+/* Make melting text blink/shimmer */
+.melting-text {
+  animation: shimmer-text 1.5s infinite;
+}
+@keyframes shimmer-text {
+  0% { opacity: 0.4; }
+  50% { opacity: 1; }
+  100% { opacity: 0.4; }
+}
+
+/* Fire glow effect for upvoted comments */
+.comment-fire-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  background: radial-gradient(ellipse at bottom, rgba(255, 100, 0, 0.06), transparent 70%);
+}
+
+.comment-fire-glow.active {
+  opacity: 1;
+}
+
+/* Ice melt effect for downvoted comments */
+@keyframes ice-melt {
+  0% { filter: hue-rotate(0deg); }
+  50% { filter: hue-rotate(10deg) brightness(1.05); }
+  100% { filter: hue-rotate(0deg); }
+}
+
+/* Comment deletion animation */
+@keyframes comment-faah {
+  0% {
+    opacity: var(--current-opacity, 0.15);
+    transform: scale(1);
+  }
+  30% {
+    opacity: 0.3;
+    transform: scale(1.03);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.8) translateY(10px);
+    max-height: 0;
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+  }
+}
+
+.comment-dying {
+  animation: comment-faah 0.8s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+
+/* Verified comment badge glow */
+.verified-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #5A7A5A;
+  background: rgba(90, 122, 90, 0.1);
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* FAQ match warning banner */
+.faq-match-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(255, 193, 7, 0.08);
+  border: 1px solid rgba(255, 193, 7, 0.25);
+  border-radius: 12px;
+  font-size: 13px;
+  color: #856404;
+  animation: banner-slide-in 0.3s ease;
+}
+
+@keyframes banner-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.faq-match-banner a {
+  color: #5A7A5A;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.faq-match-banner a:hover {
+  color: #3D5E3D;
+}
+

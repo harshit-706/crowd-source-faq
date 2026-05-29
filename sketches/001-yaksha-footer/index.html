@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Yaksha FAQ — Footer Sketches</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      background: #f5f5f3;
+      color: #1a1a1a;
+      line-height: 1.5;
+    }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+    }
+    .eyebrow {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #888;
+      margin-bottom: 2rem;
+    }
+    .variant-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #aaa;
+      margin-bottom: 0.5rem;
+    }
+    iframe {
+      border: 1px solid #e0e0e0;
+      border-radius: 12px;
+      background: white;
+      width: 100%;
+      height: 220px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2rem;
+      padding: 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .variant { margin-bottom: 2rem; }
+    .variant h2 { font-size: 0.9rem; font-weight: 600; margin-bottom: 0.25rem; }
+    .variant p { font-size: 0.75rem; color: #666; }
+    .note {
+      max-width: 600px;
+      margin: 0 auto 2rem;
+      padding: 1rem 1.5rem;
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      color: #92400e;
+    }
+  </style>
+</head>
+<body>
+
+<div style="max-width:1200px;margin:3rem auto;padding:0 2rem">
+  <h1>Yaksha FAQ — Footer Design Variants</h1>
+  <p class="eyebrow">Issue 6: Header + footer consistency</p>
+
+  <div class="note">
+    <strong>Goal:</strong> Make the footer consistent with the Navbar — same brand identity, navigation, and visual weight. The current footer is too minimal ("Missiles FAQ Portal" was the old wrong name). Three design directions below — pick one and I'll apply it.
+  </div>
+
+  <div class="grid">
+    <!-- VARIANT A -->
+    <div class="variant">
+      <p class="variant-label">Variant A — Compact row</p>
+      <iframe srcdoc="
+      <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        footer {
+          width: 100%;
+          border-top: 1px solid #e5e5e0;
+          background: #fafaf8;
+          padding: 1.5rem 2rem;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 1rem;
+          flex-wrap: wrap;
+        }
+        .brand {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          text-decoration: none;
+        }
+        .brand-icon {
+          width: 28px; height: 28px;
+          border: 1.5px solid #1a1a1a;
+          border-radius: 6px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .brand-icon svg { width: 14px; height: 14px; }
+        .brand-name {
+          font-size: 0.9rem;
+          font-weight: 600;
+          color: #1a1a1a;
+          font-family: Georgia, serif;
+        }
+        nav { display: flex; gap: 1.5rem; }
+        nav a {
+          font-size: 0.8rem;
+          color: #666;
+          text-decoration: none;
+          transition: color 0.2s;
+        }
+        nav a:hover { color: #1a1a1a; }
+        .social { display: flex; gap: 1rem; align-items: center; }
+        .social a {
+          color: #aaa;
+          transition: color 0.2s;
+          display: flex;
+          align-items: center;
+        }
+        .social a:hover { color: #1a1a1a; }
+        .bottom {
+          width: 100%;
+          border-top: 1px solid #f0f0ec;
+          margin-top: 0.75rem;
+          padding-top: 0.75rem;
+          display: flex;
+          justify-content: space-between;
+          font-size: 0.7rem;
+          color: #999;
+        }
+        .bottom a { color: #666; text-decoration: underline; }
+      </style>
+      <footer>
+        <a href=&quot;#&quot; class=&quot;brand&quot;>
+          <div class=&quot;brand-icon&quot;>
+            <svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;#1a1a1a&quot; stroke-width=&quot;2.5&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot;>
+              <circle cx=&quot;12&quot; cy=&quot;12&quot; r=&quot;10&quot;/>
+              <path d=&quot;M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3&quot;/>
+              <line x1=&quot;12&quot; y1=&quot;17&quot; x2=&quot;12.01&quot; y2=&quot;17&quot;/>
+            </svg>
+          </div>
+          <span class=&quot;brand-name&quot;>Yaksha FAQ</span>
+        </a>
+        <nav>
+          <a href=&quot;#&quot;>Home</a>
+          <a href=&quot;#&quot;>FAQ</a>
+          <a href=&quot;#&quot;>Community</a>
+        </nav>
+        <div class=&quot;social&quot;>
+          <a href=&quot;#&quot; aria-label=&quot;LinkedIn&quot;>
+            <svg width=&quot;16&quot; height=&quot;16&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;currentColor&quot;><path d=&quot;M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z&quot;/><rect x=&quot;2&quot; y=&quot;9&quot; width=&quot;4&quot; height=&quot;12&quot;/><circle cx=&quot;4&quot; cy=&quot;4&quot; r=&quot;2&quot;/></svg>
+          </a>
+          <a href=&quot;#&quot; aria-label=&quot;Community&quot;>
+            <svg width=&quot;16&quot; height=&quot;16&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2&quot;><circle cx=&quot;12&quot; cy=&quot;12&quot; r=&quot;10&quot;/><path d=&quot;M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3&quot;/><line x1=&quot;12&quot; y1=&quot;17&quot; x2=&quot;12.01&quot; y2=&quot;17&quot;/></svg>
+          </a>
+        </div>
+        <div class=&quot;bottom&quot;>
+          <span>&copy; 2026 Yaksha FAQ &middot; Vicharanashala, IIT Ropar</span>
+          <span>Questions? <a href=&quot;#&quot;>Ask the community</a></span>
+        </div>
+      </footer>
+      "></iframe>
+      <h2>A: Compact row</h2>
+      <p>Single-row layout, brand left, nav center, social right. Clean and space-efficient. Best for pages where footer doesn't compete for attention.</p>
+    </div>
+
+    <!-- VARIANT B -->
+    <div class="variant">
+      <p class="variant-label">Variant B — Two-row split</p>
+      <iframe srcdoc="
+      <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        footer {
+          width: 100%;
+          border-top: 1px solid #e5e5e0;
+          background: #fafaf8;
+          padding: 2rem;
+        }
+        .top {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 2rem;
+          margin-bottom: 1.5rem;
+        }
+        .brand {
+          display: flex;
+          align-items: center;
+          gap: 0.6rem;
+          text-decoration: none;
+        }
+        .brand-icon {
+          width: 32px; height: 32px;
+          border: 1.5px solid #1a1a1a;
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: #fff;
+        }
+        .brand-name {
+          font-size: 1rem;
+          font-weight: 600;
+          color: #1a1a1a;
+          font-family: Georgia, serif;
+        }
+        .brand-sub {
+          font-size: 0.7rem;
+          color: #999;
+          margin-top: 0.1rem;
+        }
+        .cols {
+          display: flex;
+          gap: 3rem;
+        }
+        .col h4 {
+          font-size: 0.7rem;
+          text-transform: uppercase;
+          letter-spacing: 0.07em;
+          color: #bbb;
+          margin-bottom: 0.6rem;
+        }
+        .col a {
+          display: block;
+          font-size: 0.8rem;
+          color: #555;
+          text-decoration: none;
+          margin-bottom: 0.4rem;
+          transition: color 0.2s;
+        }
+        .col a:hover { color: #1a1a1a; }
+        .bottom {
+          border-top: 1px solid #f0f0ec;
+          padding-top: 1rem;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: 0.7rem;
+          color: #aaa;
+        }
+        .social { display: flex; gap: 0.75rem; }
+        .social a {
+          color: #bbb;
+          display: flex;
+          align-items: center;
+          transition: color 0.2s;
+        }
+        .social a:hover { color: #1a1a1a; }
+        .bottom a { color: #888; text-decoration: underline; transition: color 0.2s; }
+        .bottom a:hover { color: #1a1a1a; }
+      </style>
+      <footer>
+        <div class=&quot;top&quot;>
+          <div>
+            <a href=&quot;#&quot; class=&quot;brand&quot;>
+              <div class=&quot;brand-icon&quot;>
+                <svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;#1a1a1a&quot; stroke-width=&quot;2.5&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot;>
+                  <circle cx=&quot;12&quot; cy=&quot;12&quot; r=&quot;10&quot;/>
+                  <path d=&quot;M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3&quot;/>
+                  <line x1=&quot;12&quot; y1=&quot;17&quot; x2=&quot;12.01&quot; y2=&quot;17&quot;/>
+                </svg>
+              </div>
+              <div>
+                <div class=&quot;brand-name&quot;>Yaksha FAQ</div>
+                <div class=&quot;brand-sub&quot;>Vicharanashala, IIT Ropar</div>
+              </div>
+            </a>
+          </div>
+          <div class=&quot;cols&quot;>
+            <div class=&quot;col&quot;>
+              <h4>Navigate</h4>
+              <a href=&quot;#&quot;>Home</a>
+              <a href=&quot;#&quot;>FAQ</a>
+              <a href=&quot;#&quot;>Community</a>
+            </div>
+            <div class=&quot;col&quot;>
+              <h4>Resources</h4>
+              <a href=&quot;#&quot;>Documentation</a>
+              <a href=&quot;#&quot;>Submit a Ticket</a>
+              <a href=&quot;#&quot;>About</a>
+            </div>
+          </div>
+        </div>
+        <div class=&quot;bottom&quot;>
+          <span>&copy; 2026 Yaksha FAQ &middot; Questions? <a href=&quot;#&quot;>Ask the community</a></span>
+          <div class=&quot;social&quot;>
+            <a href=&quot;#&quot; aria-label=&quot;LinkedIn&quot;>
+              <svg width=&quot;15&quot; height=&quot;15&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;currentColor&quot;><path d=&quot;M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z&quot;/><rect x=&quot;2&quot; y=&quot;9&quot; width=&quot;4&quot; height=&quot;12&quot;/><circle cx=&quot;4&quot; cy=&quot;4&quot; r=&quot;2&quot;/></svg>
+            </a>
+            <a href=&quot;#&quot; aria-label=&quot;samagama.in&quot;>
+              <svg width=&quot;15&quot; height=&quot;15&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2&quot;><circle cx=&quot;12&quot; cy=&quot;12&quot; r=&quot;10&quot;/><path d=&quot;M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3&quot;/><line x1=&quot;12&quot; y1=&quot;17&quot; x2=&quot;12.01&quot; y2=&quot;17&quot;/></svg>
+            </a>
+          </div>
+        </div>
+      </footer>
+      "></iframe>
+      <h2>B: Two-row split</h2>
+      <p>Top row has brand + link columns. Bottom row has copyright and social icons. More informative, gives the footer real presence. Best for content-heavy pages.</p>
+    </div>
+
+    <!-- VARIANT C -->
+    <div class="variant">
+      <p class="variant-label">Variant C — Centered minimal</p>
+      <iframe srcdoc="
+      <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        footer {
+          width: 100%;
+          border-top: 1px solid #e5e5e0;
+          background: #fafaf8;
+          padding: 2rem;
+          text-align: center;
+        }
+        .brand {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          text-decoration: none;
+          margin-bottom: 1rem;
+        }
+        .brand-icon {
+          width: 28px; height: 28px;
+          border: 1.5px solid #1a1a1a;
+          border-radius: 6px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .brand-name {
+          font-size: 0.9rem;
+          font-weight: 600;
+          color: #1a1a1a;
+          font-family: Georgia, serif;
+        }
+        nav {
+          display: flex;
+          justify-content: center;
+          gap: 2rem;
+          margin-bottom: 1rem;
+        }
+        nav a {
+          font-size: 0.8rem;
+          color: #777;
+          text-decoration: none;
+          transition: color 0.2s;
+        }
+        nav a:hover { color: #1a1a1a; }
+        .divider {
+          width: 40px;
+          height: 1px;
+          background: #e0e0dc;
+          margin: 1rem auto;
+        }
+        .social {
+          display: flex;
+          justify-content: center;
+          gap: 1.5rem;
+          margin-bottom: 1rem;
+        }
+        .social a {
+          color: #bbb;
+          display: flex;
+          align-items: center;
+          transition: color 0.2s;
+        }
+        .social a:hover { color: #1a1a1a; }
+        .copyright {
+          font-size: 0.7rem;
+          color: #bbb;
+        }
+        .copyright a { color: #999; text-decoration: underline; transition: color 0.2s; }
+        .copyright a:hover { color: #1a1a1a; }
+      </style>
+      <footer>
+        <a href=&quot;#&quot; class=&quot;brand&quot;>
+          <div class=&quot;brand-icon&quot;>
+            <svg viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;#1a1a1a&quot; stroke-width=&quot;2.5&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot;>
+              <circle cx=&quot;12&quot; cy=&quot;12&quot; r=&quot;10&quot;/>
+              <path d=&quot;M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3&quot;/>
+              <line x1=&quot;12&quot; y1=&quot;17&quot; x2=&quot;12.01&quot; y2=&quot;17&quot;/>
+            </svg>
+          </div>
+          <span class=&quot;brand-name&quot;>Yaksha FAQ</span>
+        </a>
+        <nav>
+          <a href=&quot;#&quot;>Home</a>
+          <a href=&quot;#&quot;>FAQ</a>
+          <a href=&quot;#&quot;>Community</a>
+        </nav>
+        <div class=&quot;divider&quot;></div>
+        <div class=&quot;social&quot;>
+          <a href=&quot;#&quot; aria-label=&quot;LinkedIn&quot;>
+            <svg width=&quot;16&quot; height=&quot;16&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;currentColor&quot;><path d=&quot;M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z&quot;/><rect x=&quot;2&quot; y=&quot;9&quot; width=&quot;4&quot; height=&quot;12&quot;/><circle cx=&quot;4&quot; cy=&quot;4&quot; r=&quot;2&quot;/></svg>
+          </a>
+          <a href=&quot;#&quot; aria-label=&quot;samagama.in&quot;>
+            <svg width=&quot;16&quot; height=&quot;16&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2&quot;><circle cx=&quot;12&quot; cy=&quot;12&quot; r=&quot;10&quot;/><path d=&quot;M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3&quot;/><line x1=&quot;12&quot; y1=&quot;17&quot; x2=&quot;12.01&quot; y2=&quot;17&quot;/></svg>
+          </a>
+        </div>
+        <p class=&quot;copyright&quot;>&copy; 2026 Yaksha FAQ &middot; Vicharanashala, IIT Ropar &middot; Questions? <a href=&quot;#&quot;>Ask the community</a></p>
+      </footer>
+      "></iframe>
+      <h2>C: Centered minimal</h2>
+      <p>Centered, breathing layout. Brand above, nav, divider, social, copyright stacked. Calm and elegant — matches the editorial feel of the FAQ site. Best for content-first pages.</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

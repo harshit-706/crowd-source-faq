@@ -1,0 +1,6 @@
+{
+  "name": "yaksha-faq-frontend",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
