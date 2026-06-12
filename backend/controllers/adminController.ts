@@ -310,21 +310,23 @@ export const updateFAQ = async (req: Request, res: Response): Promise<void> => {
 
     // Admin edit while under review = re-verification
     if (faq.reviewStatus === 'pending_review' || faq.reviewStatus === 'update_requested') {
+      // v1.68 — H3 fix: in-memory mutate + save() is racy.
+      // Wrap as a single atomic $set on the fields the
+      // pending-review branch touches. (reports=[] is set
+      // whether verify is true or not — the original "else"
+      // branch handled the !verify case by just clearing reports.)
       const newCycle = faq.reviewCycle + 1;
-      faq.reviewStatus = 'verified';
-      faq.lastVerifiedDate = new Date();
-      faq.flaggedAt = null;
-      faq.flagType = null;
-      faq.flagReason = null;
-      faq.flaggedBy = null;
-      faq.reviewCycle = newCycle;
-      faq.reports = [];
+      await FAQ.findOneAndUpdate(
+        { _id: faq._id },
+        { $set: { reports: [], lastVerifiedDate: new Date(), flaggedAt: null, flagType: null, flagReason: null, flaggedBy: null, reviewCycle: newCycle } },
+      );
       await FreshReviewVote.deleteMany({ faqId: faq._id });
     } else {
-      faq.reports = [];
+      await FAQ.findOneAndUpdate(
+        { _id: faq._id },
+        { $set: { reports: [] } },
+      );
     }
-
-    await faq.save();
     await logAction(req.user!._id.toString(), 'edit_faq', faq._id.toString(), 'faq', faq.question);
 
     // Invalidate search cache so updated FAQ reflects immediately

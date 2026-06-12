@@ -74,25 +74,35 @@ export const updateAiConfig = async (req: Request, res: Response): Promise<void>
     if (activeProvider !== undefined) config.activeProvider = activeProvider;
     if (features !== undefined) config.features = { ...config.features, ...features } as IAiConfig['features'];
 
+    // v1.68 — H3 fix: build a flat $set with dot-notation
+    // paths so the whole update is a single atomic write
+    // instead of in-memory mutate + save().
+    const setOps: Record<string, unknown> = {};
     if (providers && typeof providers === 'object') {
       for (const prov of ['anthropic', 'openai', 'xai', 'minimax', 'gemini', 'custom'] as AIProviderType[]) {
         const update = providers[prov];
         if (!update) continue;
-        if (update.apiKey !== undefined) config.setApiKey(prov, update.apiKey);
-        if (update.baseURL !== undefined) {
-          if (!config.providers) config.providers = {} as any;
-          if (!config.providers[prov]) config.providers[prov] = { apiKeyCipher: '', baseURL: '', model: '' } as any;
-          config.providers[prov].baseURL = update.baseURL;
+        // apiKey uses the model's encrypt path (config.setApiKey)
+        if (update.apiKey !== undefined) {
+          // Use the model's setter so the cipher is applied
+          // server-side, then read back the cipher to write.
+          config.setApiKey(prov, update.apiKey);
+          setOps[`providers.${prov}.apiKeyCipher`] = (config.providers as any)[prov]?.apiKeyCipher;
         }
-        if (update.model !== undefined) {
-          if (!config.providers) config.providers = {} as any;
-          if (!config.providers[prov]) config.providers[prov] = { apiKeyCipher: '', baseURL: '', model: '' } as any;
-          config.providers[prov].model = update.model;
-        }
+        if (update.baseURL !== undefined) setOps[`providers.${prov}.baseURL`] = update.baseURL;
+        if (update.model !== undefined)    setOps[`providers.${prov}.model`]    = update.model;
       }
     }
-
-    await config.save();
+    for (const [k, v] of Object.entries(features ?? {})) {
+      setOps[`features.${k}`] = v;
+    }
+    if (Object.keys(setOps).length > 0) {
+      await AiConfig.findOneAndUpdate(
+        { _id: config._id },
+        { $set: setOps },
+        { new: true },
+      );
+    }
     invalidateProviderCache();
     await logAction(
       (req as any).user?.id ?? 'system',
@@ -114,8 +124,11 @@ export const resetAiUsage = async (req: Request, res: Response): Promise<void> =
   try {
     const config = await AiConfig.findOne({ isActive: true });
     if (config) {
-      config.usage = { totalRequests: 0, totalEstimatedCost: 0, lastResetAt: new Date() };
-      await config.save();
+      // v1.68 — H3 fix: atomic reset via $set.
+      await AiConfig.findOneAndUpdate(
+        { _id: config._id },
+        { $set: { usage: { totalRequests: 0, totalEstimatedCost: 0, lastResetAt: new Date() } } },
+      );
     }
     await logAction((req as any).user?.id ?? 'system', 'reset_ai_usage', 'ai_config', 'ai_config', 'Usage statistics reset');
     res.json({ message: 'Usage statistics reset.' });
