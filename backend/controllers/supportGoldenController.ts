@@ -128,22 +128,34 @@ export async function convertToGolden(req: Request, res: Response): Promise<void
     }
 
     const now = new Date();
-    request.isGolden = true;
-    request.spCost = spCost;
-    request.goldenConvertedAt = now;
-    request.goldenConvertedBy = auth.userId;
-    request.goldenConvertedByName = admin.name;
-    // Tag the audit trail so future readers can find this transition
-    // in the status history even after the request is closed.
-    request.statusHistory.push({
+    const historyEntry = {
       status: request.status,
       note: note || `Promoted to Golden by ${admin.name}${spCost > 0 ? ` (-${spCost} SP)` : ''}.`,
       updatedBy: auth.userId,
       updatedByName: admin.name,
       timestamp: now,
-    });
-    request.updatedAt = now;
-    await request.save();
+    };
+    // v1.68 — H3 fix: was in-memory mutate + save(). Replace
+    // with a single atomic findOneAndUpdate so a concurrent
+    // convert-to-golden on the same ticket doesn't lose the
+    // other's fields via a trailing save() clobbering in-memory
+    // state. statusHistory uses \$push (atomic) instead of
+    // in-memory .push.
+    await SupportRequest.findOneAndUpdate(
+      { _id: request._id },
+      {
+        $set: {
+          isGolden: true,
+          spCost,
+          goldenConvertedAt: now,
+          goldenConvertedBy: auth.userId,
+          goldenConvertedByName: admin.name,
+          updatedAt: now,
+        },
+        $push: { statusHistory: historyEntry },
+      },
+      { new: true },
+    );
 
     await logAdminAction(
       auth.userId,
@@ -241,21 +253,33 @@ export async function unconverGolden(req: Request, res: Response): Promise<void>
     }
 
     const now = new Date();
-    request.isGolden = false;
     const refundAmount = request.spCost;
-    request.spCost = 0;
-    request.goldenConvertedAt = null;
-    request.goldenConvertedBy = null;
-    request.goldenConvertedByName = '';
-    request.statusHistory.push({
+    const historyEntry = {
       status: request.status,
       note: note || `Golden conversion rolled back by ${admin.name}${refundAmount > 0 ? ` (${refundAmount} SP refunded)` : ''}.`,
       updatedBy: auth.userId,
       updatedByName: admin.name,
       timestamp: now,
-    });
-    request.updatedAt = now;
-    await request.save();
+    };
+    // v1.68 — H3 fix: same atomic-update pattern as the
+    // convertToGolden call above. In-memory mutate + save() is
+    // a race waiting to happen; findOneAndUpdate with $set +
+    // $push is atomic.
+    await SupportRequest.findOneAndUpdate(
+      { _id: request._id },
+      {
+        $set: {
+          isGolden: false,
+          spCost: 0,
+          goldenConvertedAt: null,
+          goldenConvertedBy: null,
+          goldenConvertedByName: '',
+          updatedAt: now,
+        },
+        $push: { statusHistory: historyEntry },
+      },
+      { new: true },
+    );
 
     await logAdminAction(
       auth.userId,
