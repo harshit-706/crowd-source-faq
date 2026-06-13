@@ -48,5 +48,15 @@ const searchLogSchema = new MongooseSchema(
   { timestamps: true } // Automatically records exactly when the search happened via 'createdAt'
 );
 
+// v1.68 — schema TTL: search logs auto-expire after 90 days.
+//   The trending-topics aggregation only needs the last N
+//   days; the 90-day window matches the analytics retention
+//   policy and bounds the collection size without losing
+//   analytical value. Mongo's TTL monitor runs every 60s.
+searchLogSchema.index(
+  { createdAt: 1 },
+  { expireAfterSeconds: 90 * 24 * 60 * 60 }
+);
+
 // Export the model, explicitly defining the target collection name ('yaksha_faq_searchlogs')
 export default mongoose.model<ISearchLog>('SearchLog', searchLogSchema, 'yaksha_faq_searchlogs');

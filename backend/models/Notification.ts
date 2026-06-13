@@ -74,4 +74,18 @@ const notificationSchema = new MongooseSchema(
 // Compound index for efficient per-user unread count queries
 notificationSchema.index({ recipient: 1, read: 1, createdAt: -1 });
 
+// v1.68 — schema TTL: read notifications auto-expire after
+//   30 days. The unread-bell count is what's important;
+//   the historical list of read items doesn't need to
+//   live forever. UNREAD notifications (read: false) are
+//   excluded by the partialFilterExpression so the user
+//   never loses something they haven't seen yet.
+notificationSchema.index(
+  { createdAt: 1 },
+  {
+    expireAfterSeconds: 30 * 24 * 60 * 60,
+    partialFilterExpression: { read: true },
+  }
+);
+
 export default mongoose.model<INotification>('Notification', notificationSchema, 'yaksha_faq_notifications');
