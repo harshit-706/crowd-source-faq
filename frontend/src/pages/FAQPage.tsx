@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom';
 import Navbar from '../components/layout/Navbar';
 import Footer from '../components/layout/Footer';
-import SearchBar from '../components/ui/SearchBar';
+import SearchBar from '../components/search/SearchBar';
 import { FAQDoodles } from '../components/ui/PageDoodles';
 import api, { friendlyError } from '../utils/api';
 import type { TrendingQuery } from '../types/ui';

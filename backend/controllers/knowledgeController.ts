@@ -144,8 +144,8 @@ export const answerFromKnowledgeController = async (req: Request, res: Response)
 export const askAIController = async (req: Request, res: Response): Promise<void> => {
   try {
     // For multipart requests, the question is a form field; for JSON, it's in body.
-    const body = (req.body ?? {}) as { question?: string };
-    const question = String(body.question ?? '').trim();
+    const body = (req.body ?? {}) as { question?: string; query?: string };
+    const question = String(body.question ?? body.query ?? '').trim();
     if (question.length < 3) {
       res.status(400).json({ message: 'Question must be at least 3 characters' });
       return;

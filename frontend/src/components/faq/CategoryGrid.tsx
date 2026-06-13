@@ -1,5 +1,40 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, type ReactNode } from 'react';
 import { FAQItem, getCategoryTheme, getCategoryDescription, getCategoryIcon, formatCategoryName, getQuestionTitle } from './faqUtils';
+
+/**
+ * Static category list — mirrors `categories[]` in backend/faqs.json
+ * (v24.4.0, 14 sections). Used by HomePage and InteractiveSearchOverlay
+ * for search-suggestion matching. Kept in sync with the seed; update
+ * both files when the section list changes.
+ *
+ * @deprecated Data should eventually come from the API at runtime;
+ * for now the seed is the source of truth.
+ */
+export const categoryPills: { name: string; icon: ReactNode }[] = [
+  { name: '1. About the internship', icon: <TagIcon /> },
+  { name: '2. Timing and dates', icon: <TagIcon /> },
+  { name: '3. NOC (No Objection Certificate)', icon: <TagIcon /> },
+  { name: '4. Selection, offer letter, and certificate', icon: <TagIcon /> },
+  { name: '5. Work, mentorship, and projects', icon: <TagIcon /> },
+  { name: '6. Code of conduct — communication channels', icon: <TagIcon /> },
+  { name: '7. Interviews Related', icon: <TagIcon /> },
+  { name: '8. Certificate', icon: <TagIcon /> },
+  { name: '9. Rosetta — your internship journal', icon: <TagIcon /> },
+  { name: '10. Phase 1 — coursework, Vibe LMS, and live sessions', icon: <TagIcon /> },
+  { name: '11. Spurti Points', icon: <TagIcon /> },
+  { name: '12. Yaksha Chat Related', icon: <TagIcon /> },
+  { name: '13. ViBe Platform', icon: <TagIcon /> },
+  { name: '14. Team Formation', icon: <TagIcon /> },
+];
+
+function TagIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+      <circle cx="7" cy="7" r="1.2" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
 
 interface CategoryCardProps {
   name: string;

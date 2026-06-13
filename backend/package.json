@@ -8,6 +8,7 @@
     "start": "tsx server.ts",
     "dev": "tsx watch server.ts",
     "build": "tsc",
+    "typecheck": "tsc --noEmit",
     "migrate": "tsx scripts/addIndexes.ts",
     "create:vector-index": "tsx scripts/createVectorIndex.ts",
     "seed": "tsx scripts/seed.ts",

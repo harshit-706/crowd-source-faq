@@ -3,14 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Navbar from '../components/layout/Navbar';
 import Footer from '../components/layout/Footer';
-import SearchBar from '../components/ui/SearchBar';
-import CategoryGrid, { categoryPills } from '../components/ui/CategoryGrid';
-import TopSolved from '../components/ui/TopSolved';
-import TrendingIssues from '../components/ui/TrendingIssues';
-import FromMeetings from '../components/ui/FromMeetings';
+import SearchBar from '../components/search/SearchBar';
+import CategoryGrid, { categoryPills } from '../components/faq/CategoryGrid';
+import CategoryPillBar from '../components/faq/CategoryPillBar';
+import TopSolved from '../components/community/TopSolved';
+import TrendingIssues from '../components/search/TrendingIssues';
+import FromMeetings from '../components/faq/FromMeetings';
 import CTA from '../components/ui/CTA';
-import ResultItem, { getConfidenceLevel } from '../components/ui/ResultItem';
-import HistoryModal from '../components/ui/HistoryModal';
+import ResultItem, { getConfidenceLevel } from '../components/search/ResultItem';
+import HistoryModal from '../components/faq/HistoryModal';
 import api, { friendlyError } from '../utils/api';
 import { useAuth } from '../hooks/useAuth';
 import { useAuthGate } from '../context/AuthModalContext';
@@ -517,7 +518,7 @@ export default function HomePage() {
           <div className={`mt-5 sm:mt-6 transition-all duration-300 ${
             showDropdown ? 'opacity-70 translate-y-1' : 'opacity-100'
           }`}>
-            <CategoryGrid
+            <CategoryPillBar
               activeCategory={activeCategory}
               onSelect={handleCategorySelect}
             />

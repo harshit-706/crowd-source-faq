@@ -218,8 +218,11 @@ start_backend() {
   touch "$SESSION_LOG"
   echo "$SESSION_LOG" > /tmp/yaksha-session-log
 
-  # Keep latest symlink for easy access
-  ln -sf "session_${SESSION_TIMESTAMP}.txt" "$ROOT/main_log.txt" 2>/dev/null || true
+  # Keep latest symlink for easy access. v1.68 — moved the
+  # symlink from the repo root to logs/main.log so the
+  # repo root stays clean of generated artifacts. The
+  # .gitignore entry for `logs/` already keeps this out of git.
+  ln -sf "session_${SESSION_TIMESTAMP}.txt" "$ROOT/logs/main.log" 2>/dev/null || true
 
   # Run tsx — prefix each line with [backend] dim tag for greppable scrollback.
   ../node_modules/.bin/tsx watch server.ts 2>&1 | \

@@ -66,6 +66,12 @@ import {
   revealApiKey,
 } from '../controllers/aiConfigController.js';
 
+import { Types } from 'mongoose';
+import User from '../models/User.js';
+import { listSupportRequests } from '../controllers/supportRequestsController.js';
+import { updateSupportStatus } from '../controllers/supportFollowUpController.js';
+import { banUser } from '../controllers/moderationController.js';
+
 import adminProjectsRoutes from './adminProjects.js';
 
 const router = Router();
@@ -142,5 +148,47 @@ router.post('/community-promotions/:id/ai-review', triggerAIReview);
 router.post('/community-promotions/ai-review-batch', triggerAIReviewBatch);
 // Promotion queue — new endpoint showing posts with AI output
 router.get('/community-promotions/queue', getPromotionQueue);
+
+// ─── Discord Bot Support/Banning Compatibility Routes ─────────────────────────
+// Support Requests inbox: GET /api/admin/support/requests
+router.get('/support/requests', listSupportRequests);
+
+// Support Request Resolve: PATCH /api/admin/support/requests/:id
+router.patch('/support/requests/:id', async (req, res, next) => {
+  // Map bot request body { resolutionNote } to { adminNote } / { resolutionSummary }
+  if (req.body.resolutionNote) {
+    req.body.adminNote = req.body.resolutionNote;
+    req.body.resolutionSummary = req.body.resolutionNote;
+  }
+  return updateSupportStatus(req, res);
+});
+
+// Ban User: POST /api/admin/users/ban
+router.post('/users/ban', async (req, res, next) => {
+  const { user: userIdentifier, reason } = req.body as { user?: string; reason?: string };
+  if (!userIdentifier) {
+    res.status(400).json({ message: 'user identifier required' });
+    return;
+  }
+  try {
+    let targetUser = null;
+    if (Types.ObjectId.isValid(userIdentifier)) {
+      targetUser = await User.findById(userIdentifier);
+    }
+    if (!targetUser) {
+      targetUser = await User.findOne({ email: userIdentifier });
+    }
+    if (!targetUser) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+    
+    // Set req.body.userId so banUser controller works
+    req.body.userId = targetUser._id.toString();
+    return banUser(req, res);
+  } catch (err) {
+    next(err);
+  }
+});
 
 export default router;

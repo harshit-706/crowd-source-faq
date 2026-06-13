@@ -37,6 +37,18 @@ export async function verifyAndLoadUser(
   req: AuthedRequest,
   res: Response
 ): Promise<IUser | null> {
+  // Check for X-Internal-API-Key bypass
+  const internalKey = req.headers['x-internal-api-key'] || req.headers['X-Internal-API-Key'] || req.headers['x-api-key'];
+  const expectedKey = process.env.INTERNAL_API_KEY;
+  if (expectedKey && internalKey && typeof internalKey === 'string' && internalKey.trim() === expectedKey.trim()) {
+    const systemAdmin = await User.findOne({ role: 'admin' }).select('-password');
+    if (systemAdmin) {
+      req.user = systemAdmin as IUser;
+      req.auth = { id: systemAdmin._id.toString() };
+      return systemAdmin as IUser;
+    }
+  }
+
   const token = req.headers.authorization?.startsWith('Bearer ')
     ? req.headers.authorization!.split(' ')[1]
     : undefined;
