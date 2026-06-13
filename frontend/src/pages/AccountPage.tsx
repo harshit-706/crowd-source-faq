@@ -30,10 +30,13 @@ export default function AccountPage() {
   const [transcriptSelectedFile, setTranscriptSelectedFile] = useState<{ file: File; type: 'vtt' | 'txt' } | null>(null);
 
   // ─── Document Upload (OCR + AI extraction) ─────────────────────
-  // Available to all logged-in users — admins can see the per-row
-  // review queue at /admin/document-insights. Mirrors the
-  // transcript-upload pattern: pick file → POST → poll for
-  // completion via listMyDocuments.
+  // v1.68 — admin/moderator only (matches the backend
+  // authorize() gate on POST /api/documents/upload). The
+  // section is hidden for non-admin users. The per-row
+  // review queue is at /admin/document-insights. Mirrors
+  // the transcript-upload pattern: pick file → POST → poll
+  // for completion via listMyDocuments.
+  const isUploadAuthorized = user?.role === 'admin' || user?.role === 'moderator';
   const [docUploading, setDocUploading] = useState(false);
   const [docMsg, setDocMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [docRecentId, setDocRecentId] = useState<string | null>(null);
@@ -513,9 +516,11 @@ export default function AccountPage() {
           </div>
         )}
 
-        {/* Document Upload — OCR + AI extraction. Any authed user
-            can submit images / PDFs / DOCX / XLSX. Admins review
-            the extracted insights at /admin/document-insights. */}
+        {/* Document Upload — OCR + AI extraction. Admin/moderator
+            only (v1.68 — was open to all authed users). Hidden
+            for regular users; the per-row review queue lives at
+            /admin/document-insights. */}
+        {isUploadAuthorized && (
         <div className="bg-card rounded-2xl border border-border p-6 space-y-4">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
@@ -584,6 +589,7 @@ export default function AccountPage() {
             </div>
           )}
         </div>
+        )}
 
         {/* Logout */}
         <button

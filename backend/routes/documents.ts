@@ -1,6 +1,13 @@
 /**
  * documents.ts — routes for the OCR / document pipeline.
  *
+ * v1.68 — uploads are now ADMIN/MODERATOR only. Previously
+ * any authed user could upload; the platform was treated
+ * like a community wiki. The review queue at
+ * /admin/document-insights handles the resulting insights,
+ * but the upload itself is a moderation/curation action
+ * and should only be available to admins and moderators.
+ *
  * User-facing reads: own uploads + own insights
  * Admin-facing: insight review queue + manual promote triggers
  *
@@ -23,12 +30,19 @@ import {
 
 const router = Router();
 
-// ─── User-facing ──────────────────────────────────────────────────────────────
+// ─── Admin / Moderator only ──────────────────────────────────────────────
+// v1.68 — uploads are now restricted. The `authorize` middleware
+// returns 403 for any role not in the list. Keeps the existing
+// user-facing read endpoints (listMyDocuments, getDocument,
+// listDocumentInsights) under plain `protect` so a regular
+// user can still see the upload history for their own account.
+router.use(protect);
 
 // POST /api/documents/upload — multipart/form-data
 // Note: uploadMiddleware is [multer.single, rateLimiter], wired
 // here in order so the rate limiter sees the parsed file.
-router.post('/upload', protect, ...uploadMiddleware, uploadDocument);
+// v1.68 — admin/moderator only (was: any authed user).
+router.post('/upload', authorize('admin', 'moderator'), ...uploadMiddleware, uploadDocument);
 
 router.get('/my',           protect, listMyDocuments);
 router.get('/:id/insights', protect, listDocumentInsights);
