@@ -1,7 +1,12 @@
 import { Request, Response } from 'express';
+import { Types } from 'mongoose';
 import User, { calculateTier } from '../models/User.js';
 import ReputationLog from '../models/ReputationLog.js';
 import Badge from '../models/Badge.js';
+// v1.69 — Phase 7 prep: when the leaderboard is scoped to a
+// program, the source of truth is the per-user-per-program
+// ProgramReputation doc, not the global User.points field.
+import ProgramReputation from '../models/ProgramReputation.js';
 import { adminLog } from '../utils/http/logger.js';
 
 // ─── Auto Badge Awarder ─────────────────────────────────────────────────────
@@ -205,6 +210,44 @@ export const getLeaderboard = async (req: Request, res: Response): Promise<void>
   try {
     const limit = Math.min(parseInt(String(req.query.limit ?? '10')), 50);
     const period = String(req.query.period ?? 'all'); // 'weekly' | 'monthly' | 'all'
+    // v1.69 — Phase 3i: per-program leaderboard. When ?batchId=
+    // is supplied, switch from the global User.points/ReputationLog
+    // to the per-user-per-program ProgramReputation doc. Time
+    // windows collapse to 'all' inside the per-program branch
+    // (we don't aggregate per-period from ProgramReputation yet —
+    // Phase 7 will).
+    const rawBatchId = req.query.batchId;
+    const batchId = typeof rawBatchId === 'string' && Types.ObjectId.isValid(rawBatchId)
+      ? new Types.ObjectId(rawBatchId)
+      : null;
+    if (batchId) {
+      const perProgramRows = await ProgramReputation.find({ batchId })
+        .sort({ points: -1 })
+        .limit(limit)
+        .populate('userId', 'name tier createdAt positiveBadges acceptedAnswers faqContributions')
+        .lean();
+      const rank = perProgramRows
+        .filter((r) => r.userId && !r.userId.isDeleted && !r.userId.isBanned)
+        .map((r, i) => {
+          const u = r.userId as { name?: string; tier?: string; createdAt?: Date; positiveBadges?: unknown[]; acceptedAnswers?: number; faqContributions?: number };
+          return {
+            rank: i + 1,
+            userId: r.userId._id,
+            name: u.name,
+            points: r.points,
+            sp: r.sp,
+            tier: r.tier,
+            badges: Array.isArray(u.positiveBadges) ? u.positiveBadges.length : 0,
+            acceptedAnswers: u.acceptedAnswers ?? 0,
+            faqContributions: u.faqContributions ?? 0,
+            joinedAt: u.createdAt,
+            scope: 'program' as const,
+            batchId: r.batchId,
+          };
+        });
+      res.json({ leaderboard: rank, total: rank.length, period: 'all', sort: 'points', scope: 'program' });
+      return;
+    }
     // v1.65 — Spurti Points leaderboard. `?sort=sp` re-ranks the same
     // eligible users by `sp` desc instead of by `points` desc. The
     // response shape stays the same so the frontend can render either
