@@ -18,6 +18,14 @@ export interface IBatch extends Document {
   endDate: Date;
   /** Admins can disable a batch without deleting it (hides from public). */
   isActive: boolean;
+  /**
+   * The single batch that auto-resolves when no batch is selected.
+   * Enforced unique via a partial index below — only one Batch may
+   * have `isDefault: true` at a time. The seed script and the admin
+   * "Set as default" action both clear the flag on other batches
+   * before setting it.
+   */
+  isDefault: boolean;
   createdBy: Types.ObjectId | null;
   createdAt: Date;
   updatedAt: Date;
@@ -41,6 +49,7 @@ const batchSchema = new MongooseSchema<IBatch>(
     // v1.68 — schema fix: ensure endDate > startDate. Catches
     // admin fat-finger (e.g. swapping the two dates).
     isActive:  { type: Boolean, default: true, index: true },
+    isDefault: { type: Boolean, default: false, index: true },
     createdBy: { type: MongooseSchema.Types.ObjectId, ref: 'User', default: null },
   },
   { timestamps: true }
@@ -59,5 +68,49 @@ batchSchema.index(
 
 // Most-used query: list active batches sorted by start date desc (newest first)
 batchSchema.index({ isActive: 1, startDate: -1 });
+
+// At most one batch may carry the `isDefault: true` flag. Partial
+// filter so legacy / non-default batches don't conflict on the index.
+batchSchema.index(
+  { isDefault: 1 },
+  { unique: true, partialFilterExpression: { isDefault: true } }
+);
+
+/**
+ * v1.69 — slug helper. Slugs are auto-derived from `name` (lowercased,
+ * non-alphanumerics collapsed to dashes, trimmed). No DB column —
+ * derived at read time. Mongo's `name` index is case-insensitive
+ * unique so collisions on derived slugs are impossible.
+ *
+ * Mirrors `frontend/src/utils/programSlug.ts`. Keep both in sync.
+ */
+export function slugifyProgramName(name: string): string {
+  return name
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'program';
+}
+
+/**
+ * v1.69 — atomically mark `id` as the default batch. Clears the flag
+ * on every other batch first, then sets it on the target. Uses two
+ * sequential writes; for higher-stakes deployments, wrap in a
+ * `mongoose.startSession()` transaction (Mongoose 7+).
+ */
+batchSchema.statics.setAsDefault = async function setAsDefault(id: Types.ObjectId): Promise<IBatch | null> {
+  await this.updateMany(
+    { isDefault: true, _id: { $ne: id } },
+    { $set: { isDefault: false } }
+  );
+  const updated = await this.findByIdAndUpdate(
+    id,
+    { $set: { isDefault: true } },
+    { new: true }
+  );
+  return updated;
+};
 
 export default mongoose.model<IBatch>('Batch', batchSchema, 'yaksha_faq_batches');
