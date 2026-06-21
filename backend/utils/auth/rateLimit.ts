@@ -7,14 +7,18 @@
  *  - Per-user privileged action limits
  *  - Per-IP stricter limits for sensitive unauthenticated routes
  *
- * Uses in-memory Map — valid for single-instance deployments.
- * For serverless/multi-instance, replace with Redis-backed store.
+ * v1.70 — Redis-backed via rate-limit-redis when REDIS_TCP_URL is set
+ * (see `rateLimitRedis.ts`). When unset, falls back to express-rate-limit's
+ * in-memory Map — fine for single-instance dev/test, but bypassable when
+ * the backend runs on multiple replicas (each replica has its own Map).
+ * Fixes issue #6.
  */
 
-import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator, type Store } from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
 import { type Request, type Response } from 'express';
 import { logger } from '../http/logger.js';
+import { getRedisRateLimitStore } from './rateLimitRedis.js';
 
 // ─── Shared key extractors ────────────────────────────────────────────────────
 
@@ -60,9 +64,16 @@ interface LimiterConfig {
  * Factory: builds a configured express-rate-limit middleware.
  *
  * It limits “how many requests are allowed per unique key” inside a
- * time window (windowMs).
+ * time window (windowMs). When REDIS_TCP_URL is set, the store is
+ * the Redis-backed RedisStore returned by getRedisRateLimitStore()
+ * — limits are shared across all replicas hitting the same Redis.
+ * Otherwise express-rate-limit uses its in-memory Map.
  */
 export function createIdentityLimiter(config: LimiterConfig) {
+  // Resolve the store once per limiter. The RedisStore is memoized
+  // inside rateLimitRedis.ts, so we don't open a new connection per
+  // limiter — just reuse the same one for all five pre-built limiters.
+  const store: Store | undefined = getRedisRateLimitStore();
   return rateLimit({
     windowMs: config.windowMs,
     max: config.max,
@@ -73,6 +84,10 @@ export function createIdentityLimiter(config: LimiterConfig) {
     standardHeaders: true,
     legacyHeaders: false,
     message: config.message ?? 'Too many requests, please try again later.',
+    // When the Redis store is available, attach it so express-rate-limit
+    // uses it. When undefined, express-rate-limit uses its default
+    // MemoryStore (correct fallback).
+    store: store,
   });
 }
 
