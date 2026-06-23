@@ -27,6 +27,7 @@ import courseRoutes from '../modules/program/course.routes.js';
 import enrollmentRoutes from '../modules/program/enrollment.routes.js';
 import supportRoutes from '../modules/support/support.routes.js';
 import featureFlagRoutes from '../modules/program/feature-flag.routes.js';
+import adminConfigRoutes from '../modules/admin/admin.config.routes.js';
 import { documentRouter, documentAdminRouter } from '../modules/knowledge/documents.routes.js';
 import welcomeRoutes from '../modules/program/welcome.routes.js';
 import adminWelcomeRoutes from '../modules/admin/admin-welcome.routes.js';
@@ -72,6 +73,7 @@ export function registerRoutes(app: Express): void {
   router.use('/', enrollmentRoutes);
   router.use('/support', supportRoutes);
   router.use('/feature-flags', featureFlagRoutes);
+  router.use('/admin/config', adminConfigRoutes);
   router.use('/documents',       documentRouter);
   router.use('/admin/documents', documentAdminRouter);
   router.use('/welcome', welcomeRoutes);
