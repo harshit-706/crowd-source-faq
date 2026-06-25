@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
 
 env:
-  INFISICAL_ENVIRONMENT: production
-  INFISICAL_SECRET_PATH: /
+  INFISICAL_ENVIRONMENT: prod
+  INFISICAL_SECRET_PATH: csfaq/
   INFISICAL_API_URL: https://app.infisical.com
 
 jobs:
