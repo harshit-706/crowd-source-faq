@@ -1,8 +1,9 @@
+
 import express from 'express';
-import { 
-  getProjects, 
-  createProject, 
-  updateProject, 
+import {
+  getProjects,
+  createProject,
+  updateProject,
   deleteProject,
   getOrientations,
   uploadOrientation,
@@ -11,7 +12,11 @@ import {
   updateOrientation,
   getOnboardingStatus,
   updateOnboardingStatus,
-  getOnboardingAuditLogs
+  getOnboardingAuditLogs,
+  getZoomSettings,
+  updateZoomSettings,
+  uploadZoomTranscript,
+  regenerateZoomAssessmentPool
 } from '../controllers/adminWelcomeController.js';
 import { adminOnly } from '../middleware/admin.js';
 import { protect } from '../middleware/auth.js';
@@ -37,6 +42,7 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage });
+const uploadMemory = multer({ storage: multer.memoryStorage() });
 
 // All these routes require admin/moderator auth
 router.use(protect);
@@ -60,5 +66,11 @@ router.get('/onboarding-status', getOnboardingStatus);
 router.put('/onboarding-override/:userId', updateOnboardingStatus);
 // Audit Logs
 router.get('/audit-logs', getOnboardingAuditLogs);
+
+// Zoom Settings
+router.get('/zoom-settings', getZoomSettings);
+router.put('/zoom-settings', updateZoomSettings);
+router.post('/zoom-settings/transcript', uploadMemory.single('transcript'), uploadZoomTranscript);
+router.post('/zoom-settings/regenerate', regenerateZoomAssessmentPool);
 
 export default router;

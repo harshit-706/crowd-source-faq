@@ -51,7 +51,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the architecture deep-dive 
 ./run.sh        # Full-stack runner: env setup, ngrok, backend + frontend
 ```
 
-`run.sh` prompts for `MONGODB_URI` and `JWT_SECRET` on first run, then saves them to `backend/.env.local`. The script will not overwrite existing values. Session logs are written to `logs/session_*.txt`.
+`run.sh` prompts for `MONGODB_URI` and `JWT_SECRET` on first run, then saves them to `apps/backend/.env.local`. The script will not overwrite existing values. Session logs are written to `logs/session_*.txt`.
 
 ---
 
@@ -106,8 +106,9 @@ For per-route behaviour and field schemas, see [docs/ARCHITECTURE.md](docs/ARCHI
 
 ```
 Shamagama/
-├── backend/           # Express + TypeScript API
-├── frontend/          # React + Vite SPA
+├── apps/
+│   ├── backend/       # Express + TypeScript API
+│   └── frontend/      # React + Vite SPA
 ├── docs/              # Full documentation      
 └── run.sh             # Local dev runner (env setup, ngrok, backend + frontend)
 ```
