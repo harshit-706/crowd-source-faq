@@ -36,8 +36,7 @@ export function createApp(config: any): Express {
   // Register all routes
   registerRoutes(app);
 
-  // Mount special utility endpoints
-  app.get('/csfaq/api/health', internalApiKeyOrAdmin, async (req: Request, res: Response) => {
+  app.get('/csfaq/api/health', async (req: Request, res: Response) => {
     let dbStatus = 'disconnected';
     try {
       const conn = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
