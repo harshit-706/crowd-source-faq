@@ -43,6 +43,27 @@ const QUEUE_NAME = 'document-processing';
 let useLocalFallback = false;
 let queueFailed = false;
 
+// v1.71 — Warn throttle. ioredis auto-reconnects with exponential
+// backoff (~2s cap), and every reconnect attempt fires an 'error'
+// event on the Queue/Worker/QueueEvents. Without throttling, identical
+// "[documentQueue] Queue error: connect ECONNREFUSED" warns flood the
+// ops Discord channel (logger.ts forwards warn|error|alert to the
+// webhook). Throttle by (category, error-message) so:
+//   - First occurrence of any new error → logs immediately
+//   - Identical re-fires within the window → silent
+//   - After WARN_THROTTLE_MS → re-fires if the error still persists
+//   - A different error message → logs immediately even within the window
+// Pure additive; worst-case bug is "still spams", never data corruption.
+const WARN_THROTTLE_MS = 30_000;
+const lastWarnAt = new Map<string, number>();
+function shouldWarn(key: string): boolean {
+  const now = Date.now();
+  const last = lastWarnAt.get(key) ?? 0;
+  if (now - last < WARN_THROTTLE_MS) return false;
+  lastWarnAt.set(key, now);
+  return true;
+}
+
 function getRedisUrl(): string {
   const config = loadConfig();
   const fallback = process.env.REDIS_LOCAL_TCP_URL || 'redis://127.0.0.1:6379';
@@ -120,8 +141,25 @@ let _events: QueueEvents | null = null;
 function handleQueueConnectionError(err: Error) {
   const msg = err.message || '';
   const lowerMsg = msg.toLowerCase();
+  // v1.71 — Broader matchers. The original list (econnrefused, rate
+  // limit, quota, forbidden, limit exceeded, max requests) only
+  // covered "well-behaved" failures. ioredis reconnect-loop emits
+  // ECONNRESET, ETIMEDOUT, ENOTFOUND, "Connection is closed",
+  // "READONLY" (when a proxy returns it mid-stream), "Stream isn't
+  // writeable" — none of which previously flipped useLocalFallback or
+  // queueFailed. Adding them so the worker actually disables itself
+  // in the reconnect-storm scenario. The throttle on the 'error'
+  // listeners prevents the spam regardless; this just makes sure the
+  // disable path actually fires.
   if (
     lowerMsg.includes('econnrefused') ||
+    lowerMsg.includes('econnreset') ||
+    lowerMsg.includes('etimedout') ||
+    lowerMsg.includes('enotfound') ||
+    lowerMsg.includes('connection is closed') ||
+    lowerMsg.includes('readonly') ||
+    lowerMsg.includes('stream isn') ||  // "Stream isn't writeable" + "Stream is not writeable"
+    lowerMsg.includes('stream is not') ||
     lowerMsg.includes('rate limit') ||
     lowerMsg.includes('quota') ||
     lowerMsg.includes('forbidden') ||
@@ -132,11 +170,14 @@ function handleQueueConnectionError(err: Error) {
       logger.warn('[documentQueue] Remote Redis connection failed. Falling back to local Redis.');
       useLocalFallback = true;
       void recreateQueueAndWorker();
-    } else {
+    } else if (!queueFailed) {
       logger.error('[documentQueue] Fallback local Redis also failed. Disabling document processing worker.');
       queueFailed = true;
       void stopDocumentWorker();
     }
+    // If queueFailed already true, do nothing — the throttle on the
+    // listeners will prevent further noise, and re-creating a dead
+    // worker just makes more noise when it fails again.
   }
 }
 
@@ -165,6 +206,9 @@ export function getDocumentQueue(): Queue<DocumentJobData> | null {
   // BullMQ creates its own ioredis connection from these options.
   _queue = new Queue<DocumentJobData>(QUEUE_NAME, { connection: conn });
   _queue.on('error', (err) => {
+    if (queueFailed) return;
+    const key = `queue:${err.message}`;
+    if (!shouldWarn(key)) return;
     logger.warn(`[documentQueue] Queue error: ${err.message}`);
     handleQueueConnectionError(err);
   });
@@ -233,12 +277,18 @@ export function startDocumentWorker(): boolean {
     logger.warn(`[documentQueue] job ${job?.id} failed: ${err.message}`);
   });
   _worker.on('error', (err) => {
+    if (queueFailed) return;
+    const key = `worker:${err.message}`;
+    if (!shouldWarn(key)) return;
     logger.warn(`[documentQueue] worker error: ${err.message}`);
     handleQueueConnectionError(err);
   });
 
   _events = new QueueEvents(QUEUE_NAME, { connection: conn });
   _events.on('error', (err) => {
+    if (queueFailed) return;
+    const key = `events:${err.message}`;
+    if (!shouldWarn(key)) return;
     logger.warn(`[documentQueue] QueueEvents error: ${err.message}`);
     handleQueueConnectionError(err);
   });
@@ -269,6 +319,15 @@ async function recreateQueueAndWorker(): Promise<void> {
     if (conn) {
       _queue = new Queue<DocumentJobData>(QUEUE_NAME, { connection: conn });
       _queue.on('error', (err) => {
+        if (queueFailed) return;
+        // v1.71 — Shared throttle key with the primary instance so a
+        // message that's been spamming on the primary doesn't resume
+        // spamming when we recreate the fallback. The primary listener
+        // is also gated by shouldWarn, but if it already logged 1s
+        // ago and the fallback emits the same message, we want the
+        // throttle to skip the second emission.
+        const key = `queue:${err.message}`;
+        if (!shouldWarn(key)) return;
         logger.warn(`[documentQueue] fallback Queue error: ${err.message}`);
         handleQueueConnectionError(err);
       });
@@ -282,12 +341,18 @@ async function recreateQueueAndWorker(): Promise<void> {
         logger.warn(`[documentQueue] job ${job?.id} failed: ${err.message}`);
       });
       _worker.on('error', (err) => {
+        if (queueFailed) return;
+        const key = `worker:${err.message}`;
+        if (!shouldWarn(key)) return;
         logger.warn(`[documentQueue] fallback worker error: ${err.message}`);
         handleQueueConnectionError(err);
       });
 
       _events = new QueueEvents(QUEUE_NAME, { connection: conn });
       _events.on('error', (err) => {
+        if (queueFailed) return;
+        const key = `events:${err.message}`;
+        if (!shouldWarn(key)) return;
         logger.warn(`[documentQueue] fallback QueueEvents error: ${err.message}`);
         handleQueueConnectionError(err);
       });
@@ -296,6 +361,20 @@ async function recreateQueueAndWorker(): Promise<void> {
   } catch (err) {
     logger.warn(`[documentQueue] Failover recreation failed: ${(err as Error).message}`);
   }
+}
+
+/**
+ * v1.71 — Test-only: reset module-level state so each test starts
+ * with a fresh throttle Map, no worker, and no queue. NOT exported
+ * from the public API surface; only consumed by __tests__.
+ */
+export function __resetDocumentQueueForTests(): void {
+  lastWarnAt.clear();
+  _queue = null;
+  _worker = null;
+  _events = null;
+  useLocalFallback = false;
+  queueFailed = false;
 }
 
 /** Stop the worker. Called on SIGTERM. */
