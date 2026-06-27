@@ -300,18 +300,38 @@ export function startDocumentWorker(): boolean {
   return true;
 }
 
+/**
+ * Safely disconnects and closes a BullMQ instance (Queue, Worker, or QueueEvents)
+ * without hanging when the Redis connection is down/connecting.
+ */
+async function safelyClose(obj: any): Promise<void> {
+  if (!obj) return;
+  try {
+    if (obj.connection) {
+      if (obj.connection._client) {
+        obj.connection._client.disconnect();
+      }
+      obj.connection.initializing = Promise.resolve(obj.connection._client);
+    }
+    obj.initializing = Promise.resolve();
+    await obj.close();
+  } catch (err) {
+    // Ignore close errors
+  }
+}
+
 async function recreateQueueAndWorker(): Promise<void> {
   try {
     if (_worker) {
-      await _worker.close();
+      await safelyClose(_worker);
       _worker = null;
     }
     if (_queue) {
-      await _queue.close();
+      await safelyClose(_queue);
       _queue = null;
     }
     if (_events) {
-      await _events.close();
+      await safelyClose(_events);
       _events = null;
     }
     
@@ -380,15 +400,15 @@ export function __resetDocumentQueueForTests(): void {
 /** Stop the worker. Called on SIGTERM. */
 export async function stopDocumentWorker(): Promise<void> {
   if (_worker) {
-    await _worker.close();
+    await safelyClose(_worker);
     _worker = null;
   }
   if (_events) {
-    await _events.close();
+    await safelyClose(_events);
     _events = null;
   }
   if (_queue) {
-    await _queue.close();
+    await safelyClose(_queue);
     _queue = null;
   }
   logger.info('[documentQueue] worker stopped');
