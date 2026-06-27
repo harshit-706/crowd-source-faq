@@ -46,19 +46,24 @@ export function validateEnv(): void {
     errors.push('PORT must be numeric');
   }
 
+  const isValidConfigValue = (val: string | undefined): val is string => {
+    return val !== undefined && val.trim() !== '' && val !== '###' && !val.startsWith('#');
+  };
+
   // Optional: CLIENT_URL
   const clientUrl = process.env.CLIENT_URL;
-  if (clientUrl !== undefined && !/^https?:\/\/.+/.test(clientUrl)) {
+  if (isValidConfigValue(clientUrl) && !/^https?:\/\/.+/.test(clientUrl)) {
     errors.push('CLIENT_URL must be a valid http:// or https:// URL');
   }
 
   // Optional: REDIS_URL
   const redisUrl = process.env.REDIS_URL;
-  if (redisUrl !== undefined) {
+  if (isValidConfigValue(redisUrl)) {
     if (!/^https?:\/\/.+/.test(redisUrl)) {
       errors.push('REDIS_URL must be a valid URL');
     }
-    if (!process.env.REDIS_TOKEN) {
+    const redisToken = process.env.REDIS_TOKEN;
+    if (!isValidConfigValue(redisToken)) {
       errors.push('REDIS_TOKEN is required when REDIS_URL is provided');
     }
   }
@@ -66,14 +71,16 @@ export function validateEnv(): void {
   // Optional: Zoom OAuth
   const zoomClientId = process.env.ZOOM_CLIENT_ID;
   const zoomClientSecret = process.env.ZOOM_CLIENT_SECRET;
-  if (zoomClientId !== undefined && zoomClientSecret === undefined) {
+  const hasZoomClientId = isValidConfigValue(zoomClientId);
+  const hasZoomClientSecret = isValidConfigValue(zoomClientSecret);
+  if (hasZoomClientId && !hasZoomClientSecret) {
     errors.push('ZOOM_CLIENT_SECRET is required when ZOOM_CLIENT_ID is provided');
   }
-  if (zoomClientSecret !== undefined && zoomClientId === undefined) {
+  if (hasZoomClientSecret && !hasZoomClientId) {
     errors.push('ZOOM_CLIENT_ID is required when ZOOM_CLIENT_SECRET is provided');
   }
   const redirectUri = process.env.ZOOM_REDIRECT_URI;
-  if (redirectUri !== undefined && !/^https?:\/\/.+/.test(redirectUri)) {
+  if (isValidConfigValue(redirectUri) && !/^https?:\/\/.+/.test(redirectUri)) {
     errors.push('ZOOM_REDIRECT_URI must be a valid URL');
   }
 
