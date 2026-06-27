@@ -55,6 +55,9 @@ jobs:
             echo "==> Cleaning quotes from env file..."
             sed -i "s/='\(.*\)'/=\1/; s/=\"\(.*\)\"/=\1/" apps/backend/.env
 
+            echo "==> Debug: Listing exported env keys (values masked)..."
+            grep -o '^[A-Za-z0-9_]*=' apps/backend/.env || echo "⚠️  No keys found in .env file!"
+
             echo "==> Installing all workspace dependencies..."
             pnpm install --frozen-lockfile
 
