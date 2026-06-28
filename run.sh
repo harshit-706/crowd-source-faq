@@ -207,7 +207,7 @@ start_backend() {
   set +a
   # Kill any existing process on port 6767 before starting
   pkill -f "tsx.*server" 2>/dev/null || true
-  pkill -u $(whoami) -f "node|tsx" 2>/dev/null || true
+  pkill -f "src/server.ts" 2>/dev/null || true
   sleep 1
 
   # Session log — timestamped, previous sessions preserved
