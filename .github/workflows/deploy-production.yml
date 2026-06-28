@@ -79,6 +79,9 @@ jobs:
             echo "==> Waiting 20 seconds for compilation/startup to complete..."
             sleep 20
 
+            echo "0. Printing active Nginx configuration:"
+            cat /etc/nginx/sites-enabled/* /etc/nginx/conf.d/* 2>/dev/null || cat /etc/nginx/nginx.conf || echo "❌ Could not read Nginx config"
+
             echo "1. Checking if port 6767 is active:"
             ss -lptn 'sport = :6767' 2>/dev/null || netstat -lptn 2>/dev/null | grep 6767 || echo "❌ No process listening on 6767"
 
