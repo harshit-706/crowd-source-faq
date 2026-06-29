@@ -271,13 +271,25 @@ export const semanticSearch = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    // 2. Compute AI Embedding for the search term
-    const embedding = await generateQueryEmbedding(query);
+    // 2. Compute AI Embedding for the search term. If the embedding service
+    //    is unreachable (e.g. local model/endpoint down), DON'T fail the whole
+    //    request — degrade gracefully to keyword-only search. The hybrid
+    //    pipeline already runs a $text ranker, so results still come back.
+    let embedding: number[] | null = null;
+    try {
+      embedding = await generateQueryEmbedding(query);
+    } catch (embErr) {
+      httpLog.warn('search.embedding.failed — falling back to keyword-only search', {
+        error: embErr instanceof Error ? embErr.message : String(embErr),
+      });
+    }
 
-    // 3. Execute Vector and Text searches in parallel across both collections for maximum speed
+    // 3. Execute Vector (when an embedding is available) + Text searches in
+    //    parallel across both collections for maximum speed.
+    const empty = Promise.resolve([] as SearchResultItem[]);
     const [faqVec, commVec, faqTxt, commTxt] = await Promise.all([
-      runVectorSearch('yaksha_faq_faqs', embedding, 5, batchIdObjectId),
-      runVectorSearch('yaksha_faq_communityposts', embedding, 5, batchIdObjectId),
+      embedding ? runVectorSearch('yaksha_faq_faqs', embedding, 5, batchIdObjectId) : empty,
+      embedding ? runVectorSearch('yaksha_faq_communityposts', embedding, 5, batchIdObjectId) : empty,
       runTextSearch('yaksha_faq_faqs', query, 5, batchIdObjectId),
       runTextSearch('yaksha_faq_communityposts', query, 5, batchIdObjectId)
     ]);
