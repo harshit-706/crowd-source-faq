@@ -103,6 +103,17 @@ export interface ICommunityPost extends Document {
   aiAnswerEscalatedAt?: Date | null;
   aiAnswerEscalatedReason?: string | null;
   aiAnswerAttempts?: number;
+  /** Phase 3 R12 — fetchContext snapshot written each auto-answer run. */
+  aiContext?: {
+    hits?: unknown;
+    sources?: unknown;
+    query?: string | null;
+    takenAt?: Date | null;
+  } | null;
+  /** Drives the cooldown gate in services/autoAnswer.ts. */
+  lastAutoAnswerAt?: Date | null;
+  /** Set by editFAQ hook when the source FAQ moves. */
+  pendingReviews?: boolean;
   // AI audit tracking (shared with FAQ audit)
   lastCheckedAt?: Date | null;
   comments: Types.Subdocument[];
