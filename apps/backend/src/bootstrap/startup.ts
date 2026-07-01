@@ -124,8 +124,19 @@ export async function startup(config: any): Promise<void> {
     runOnStartup: false,
   });
 
-  const { isFeatureEnabled } = await import('../modules/program/feature-flag.controller.js');
-  const pipelineEnabled = await isFeatureEnabled('documentPipeline');
+  const { featureFlags, syncFeatureFlagRegistry } = await import('../services/featureFlags.js');
+  // Phase 1 R1: fail-closed boot check. Seed any registry flags that
+  // are missing from MongoDB and warn about orphans. Crashing here
+  // would prevent the server from booting after a partial deploy;
+  // logging is the right level — we don't want to brick prod over
+  // an off-by-one in the seed step.
+  try {
+    await syncFeatureFlagRegistry();
+  } catch (e) {
+    startupLog.error(`[featureFlags] registry sync failed at startup: ${(e as Error).message}`);
+  }
+
+  const pipelineEnabled = await featureFlags.isEnabled('documentPipeline');
 
   let documentWorkerStarted = false;
   if (pipelineEnabled) {

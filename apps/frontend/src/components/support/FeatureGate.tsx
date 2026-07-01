@@ -78,8 +78,12 @@ export function FeatureGate({
   requiredRoles?: string[];
 }): React.ReactElement {
   const { user } = useAuth();
-  const enabled = useFeatureFlag(featureKey);
-  if (enabled === undefined) {
+  // FeatureGate accepts arbitrary string keys (some callers may pass
+  // ad-hoc keys from the route layer). Pass through cast — useFeatureFlag
+  // will warn / throw in dev for unknown keys.
+  const result = useFeatureFlag(featureKey as Parameters<typeof useFeatureFlag>[0]);
+  const { enabled, loading } = result;
+  if (loading) {
     return (
       <>{loadingFallback ?? (
         <div className="min-h-[40vh] flex items-center justify-center">
@@ -88,12 +92,9 @@ export function FeatureGate({
       )}</>
     );
   }
-  if (enabled === null) {
-    // Flag key not found in map — the flag does not exist in the system.
-    // Render the unavailable panel so admins notice the misconfiguration.
-    return <FeatureDisabledPanel feature={featureLabel} />;
-  }
-  if (!enabled) {
+  if (!enabled || result.source === 'unknown') {
+    // Flag key not found in map, or feature is off. Render the
+    // unavailable panel so admins notice the misconfiguration.
     return <FeatureDisabledPanel feature={featureLabel} />;
   }
   if (requiredRoles && requiredRoles.length > 0 && !requiredRoles.includes(user?.role ?? '')) {

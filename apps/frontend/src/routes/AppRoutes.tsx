@@ -81,7 +81,7 @@ function GoldenRoute() {
 export default function AppRoutes() {
   const { loading } = useAuth();
   const location = useLocation();
-  const askAiEnabled = useFeatureFlag('askAiChatbot');
+  const { enabled: askAiEnabled } = useFeatureFlag('askAiChatbot');
   const [mounted, setMounted] = useState(false);
 
   // Prevent flash: only render routes after first auth resolution

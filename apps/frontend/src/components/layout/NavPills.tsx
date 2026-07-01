@@ -14,20 +14,21 @@ export const baseNavItems: NavItem[] = [
 
 export function useNavItems() {
   const { user } = useAuth();
-  const supportOn = useFeatureFlag('sessionSupport');
-  const goldenOn = useFeatureFlag('goldenTicket');
-  const welcomeOn = useFeatureFlag('welcomePackage');
+  const { enabled: supportOn } = useFeatureFlag('sessionSupport');
+  const { enabled: goldenOn } = useFeatureFlag('goldenTicket');
+  const { enabled: welcomeOn, loading: flagsLoading } = useFeatureFlag('welcomePackage');
 
   const goldenExtras: NavItem[] = goldenOn
     ? [{ label: 'Golden', to: '/golden', xlOnly: true as const }]
     : [];
 
-  // Welcome Package nav link is admin-controlled. `welcomeOn` is undefined
-  // while flags load and null for an unknown key — only hide on an explicit
-  // `false` so the link doesn't disappear mid-load.
-  const visibleBaseItems = welcomeOn === false
-    ? baseNavItems.filter((item) => item.to !== '/welcome')
-    : baseNavItems;
+  // Welcome Package nav link is admin-controlled. Hide on an explicit
+  // `false` (and only after the flag list has loaded — don't flicker
+  // the link off during the initial load).
+  const visibleBaseItems =
+    !flagsLoading && welcomeOn === false
+      ? baseNavItems.filter((item) => item.to !== '/welcome')
+      : baseNavItems;
 
   let allNavItems: NavItem[] = supportOn
     ? [...visibleBaseItems, { label: 'Support', to: '/support' }, ...goldenExtras]
