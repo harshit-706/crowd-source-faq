@@ -202,6 +202,12 @@ const communityPostSchema = new MongooseSchema(
       default: null,
       index: true,
     },
+    // Phase 1 R8 — soft-delete fields. Deleted docs keep the row but
+    // are filtered out by reads. Nullable + indexed on batchId+deletedAt
+    // so per-batch restore is O(1).
+    deletedAt: { type: Date, default: null, index: true },
+    deletedBy: { type: MongooseSchema.Types.ObjectId, ref: 'User', default: null },
+    deletedReason: { type: String, default: null },
     status: {
       type: String,
       enum: ['answered', 'unanswered'] as CommunityPostStatus[],
