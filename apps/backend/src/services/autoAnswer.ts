@@ -62,6 +62,22 @@ export interface AutoAnswerResult {
   topHitRank?: number;
 }
 
+// ─── Observability ─────────────────────────────────────────────────────────
+
+/**
+ * Structured decision log. Emits one line per branch in the processPost
+ * pipeline so a grep + log query can answer "why did this post get a
+ * suggest?" without reading the code. Format:
+ *   [autoAnswer] <event> <postId> {"k":"v", ...}
+ */
+function logDecision(
+  event: string,
+  postId: Types.ObjectId | string,
+  fields: Record<string, unknown>,
+): void {
+  cronLog.info(`[autoAnswer] ${event} ${String(postId)} ${JSON.stringify(fields)}`);
+}
+
 // ─── Cooldown gate ────────────────────────────────────────────────────────
 
 interface IdempotencyCheckOpts {
@@ -159,7 +175,7 @@ async function generateAnswerFromContext(
     ]);
     return { answer: (reply ?? '').trim().slice(0, 1500), sensitive };
   } catch (err) {
-    cronLog.warn(`[autoAnswer] LLM generation failed: ${(err as Error).message}`);
+    logDecision('error', post._id, { phase: 'llm', message: (err as Error).message });
     // Fall through to surfacing the top hit verbatim — better than nothing.
     return { answer: topHit.answer.slice(0, 1500), sensitive };
   }
@@ -176,7 +192,7 @@ export async function processPost(
   try {
     post = await CommunityPost.findById(postId);
   } catch (err) {
-    cronLog.warn(`[autoAnswer] processPost(${String(postId)}): findById failed: ${(err as Error).message}`);
+    logDecision('error', postId, { phase: 'findById', message: (err as Error).message });
     return makeErrorResult(`findById failed: ${(err as Error).message}`);
   }
   if (!post) {
@@ -210,7 +226,13 @@ export async function processPost(
   // 3. Idempotency gate.
   const prior = readPriorResult(post, { cooldownMinutes, now });
   if (prior) {
-    cronLog.info(`[autoAnswer] post ${String(post._id)} skipped — cooldown (${cooldownMinutes}m)`);
+    const lastAt = post.lastAutoAnswerAt ?? null;
+    const ageMs = lastAt ? now.getTime() - lastAt.getTime() : 0;
+    logDecision('cooldown_skip', post._id, {
+      status: post.aiAnswerStatus,
+      ageMs,
+      cooldownMinutes,
+    });
     return prior;
   }
 
@@ -221,7 +243,7 @@ export async function processPost(
       $set: { lastCheckedAt: now },
     });
   } catch (err) {
-    cronLog.warn(`[autoAnswer] attempts++ failed for ${String(post._id)}: ${(err as Error).message}`);
+    logDecision('error', post._id, { phase: 'attempts++', message: (err as Error).message });
     // Non-fatal — keep going.
   }
 
@@ -235,7 +257,7 @@ export async function processPost(
       maxHits: 10,
     });
   } catch (err) {
-    cronLog.warn(`[autoAnswer] fetchContext failed for ${String(post._id)}: ${(err as Error).message}`);
+    logDecision('error', post._id, { phase: 'fetchContext', message: (err as Error).message });
     return makeErrorResult(`fetchContext failed: ${(err as Error).message}`);
   }
 
@@ -249,6 +271,11 @@ export async function processPost(
       reason: 'no context — no knowledge hits matched',
       hitCount: 0,
     };
+    logDecision('ask_human', post._id, {
+      reason: 'no context',
+      hitCount: 0,
+      contextSources: context.sources,
+    });
     await persistResult(post._id, result, now);
     return result;
   }
@@ -275,6 +302,16 @@ export async function processPost(
       topHitSource: `${topHit.source}:${topHit.sourceId}`,
       topHitRank: topRank,
     };
+    logDecision('decision', post._id, {
+      decision,
+      topHitSource: result.topHitSource,
+      topHitRank: Number(topRank.toFixed(3)),
+      topHitConfidence: Number(topConfidence.toFixed(3)),
+      hitCount: context.hits.length,
+      contextSources: context.sources,
+      snapshotTakenAt: context.takenAt,
+      sensitive,
+    });
     await persistResult(post._id, result, now);
     return result;
   }
@@ -291,6 +328,15 @@ export async function processPost(
       topHitSource: `${topHit.source}:${topHit.sourceId}`,
       topHitRank: topRank,
     };
+    logDecision('decision', post._id, {
+      decision: 'suggest',
+      topHitSource: result.topHitSource,
+      topHitRank: Number(topRank.toFixed(3)),
+      topHitConfidence: Number(topConfidence.toFixed(3)),
+      hitCount: context.hits.length,
+      contextSources: context.sources,
+      snapshotTakenAt: context.takenAt,
+    });
     await persistResult(post._id, result, now);
     return result;
   }
@@ -307,6 +353,12 @@ export async function processPost(
       topHitSource: `${topHit.source}:${topHit.sourceId}`,
       topHitRank: topRank,
     };
+    logDecision('ask_human', post._id, {
+      reason: 'between ask_human and suggest thresholds',
+      topHitSource: result.topHitSource,
+      topHitRank: Number(topRank.toFixed(3)),
+      askHumanThreshold,
+    });
     await persistResult(post._id, result, now);
     return result;
   }
@@ -325,6 +377,12 @@ export async function processPost(
     topHitSource: `${topHit.source}:${topHit.sourceId}`,
     topHitRank: topRank,
   };
+  logDecision('ask_human', post._id, {
+    reason: 'below ask_human floor',
+    topHitSource: result.topHitSource,
+    topHitRank: Number(topRank.toFixed(3)),
+    askHumanThreshold,
+  });
   await persistResult(post._id, result, now);
   return result;
 }
@@ -361,7 +419,7 @@ async function persistResult(
     // Atomic write — same race-condition lesson as commit 60c1af0.
     await CommunityPost.findByIdAndUpdate(postId, { $set: update });
   } catch (err) {
-    cronLog.error(`[autoAnswer] persist failed for ${String(postId)}: ${(err as Error).message}`);
+    logDecision('error', postId, { phase: 'persist', message: (err as Error).message });
   }
 }
 
