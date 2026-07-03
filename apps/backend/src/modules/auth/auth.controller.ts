@@ -8,7 +8,7 @@ import CommunityPost from '../community/community-post.model.js';
 import Notification from '../notification/notification.model.js';
 import RevokedToken from './revoked-token.model.js';
 import RefreshToken from './refresh-token.model.js';
-import { registerSchema, loginSchema } from '../../utils/auth/validation.js';
+import { registerSchema, loginSchema, updateProfileSchema } from '../../utils/auth/validation.js';
 import { sanitizeHtml } from '../../utils/http/sanitize.js';
 import { authLog, securityLog } from '../../utils/http/logger.js';
 
@@ -259,12 +259,13 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const { name, email, avatar, guidedTourCompleted } = req.body as {
-      name?: string;
-      email?: string;
-      avatar?: { url?: string; publicId?: string; gcsUri?: string; objectPath?: string } | null;
-      guidedTourCompleted?: boolean;
-    };
+    const parsed = updateProfileSchema.safeParse(req.body);
+    if (!parsed.success) {
+      authLog.warn('profile update validation failed', { errors: parsed.error.issues.length });
+      res.status(400).json({ message: 'Validation failed', errors: parsed.error.issues });
+      return;
+    }
+    const { name, email, avatar, guidedTourCompleted } = parsed.data;
 
     if (!name && !email && avatar === undefined && guidedTourCompleted === undefined) {
       res.status(400).json({ message: 'Provide at least one of: name, email, avatar, guidedTourCompleted.' });
@@ -279,10 +280,6 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
     }> = {};
     if (name) updates.name = name;
     if (email) {
-      if (typeof email !== 'string') {
-        res.status(400).json({ message: 'Invalid email parameter.' });
-        return;
-      }
       // Check if email is already taken by another user
       const existing = await User.findOne({ email, _id: { $ne: req.user._id } });
       if (existing) {
@@ -299,28 +296,21 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
       if (avatar === null) {
         updates.avatar = null;
       } else {
-        if (!avatar || typeof avatar !== 'object') {
-          res.status(400).json({ message: 'Invalid avatar parameter.' });
-          return;
-        }
-        if (typeof avatar.url !== 'string') {
-          res.status(400).json({ message: 'avatar.url is required and must be a string.' });
-          return;
-        }
-        if (avatar.publicId !== undefined && typeof avatar.publicId !== 'string') {
-          res.status(400).json({ message: 'avatar.publicId must be a string.' });
-          return;
-        }
-        if (avatar.gcsUri !== undefined && typeof avatar.gcsUri !== 'string') {
-          res.status(400).json({ message: 'avatar.gcsUri must be a string.' });
-          return;
-        }
-        if (avatar.objectPath !== undefined && typeof avatar.objectPath !== 'string') {
-          res.status(400).json({ message: 'avatar.objectPath must be a string.' });
+        let avatarUrl: URL;
+        try {
+          avatarUrl = new URL(avatar.url);
+        } catch {
+          res.status(400).json({ message: 'avatar.url must be a valid URL.' });
           return;
         }
 
-        if (avatar.url.includes('res.cloudinary.com/')) {
+        const isCloudinaryHost = avatarUrl.hostname === 'res.cloudinary.com';
+        if (isCloudinaryHost && avatarUrl.protocol !== 'https:') {
+          res.status(400).json({ message: 'avatar.url must use HTTPS.' });
+          return;
+        }
+
+        if (isCloudinaryHost) {
           if (!avatar.publicId) {
             res.status(400).json({ message: 'avatar requires publicId for Cloudinary URLs.' });
             return;
