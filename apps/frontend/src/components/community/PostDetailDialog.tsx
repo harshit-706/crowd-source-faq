@@ -347,10 +347,10 @@ function CommentItem({ comment, post, currentUserId, userRole, onUpdate }: {
 
   const handleAccept = async () => {
     try {
-      const res = await api.patch<{ post: Post }>(
+      const res = await api.patch<{ post: Post; comments?: unknown[] }>(
         `/community/${post._id}/comments/${comment._id}/accept-answer`
       );
-      onUpdate((res.data as any).comments || []);
+      onUpdate((res.data.comments || []) as unknown as import('../../types/ui').Comment[]);
     } catch (e) {
       const msg = friendlyError(e, 'Failed to accept answer.');
       setActionError(msg);

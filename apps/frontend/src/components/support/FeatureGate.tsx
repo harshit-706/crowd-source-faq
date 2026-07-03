@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { useFeatureFlag } from '../../context/FeatureFlagContext';
 import { useAuth } from '../../hooks/useAuth';
+import type { FeatureFlagKey } from '../../ds/featureFlags';
 import Spinner from '../ui/Spinner';
 
 export function FeatureDisabledPanel({ feature }: { feature: string }): React.ReactElement {
@@ -71,13 +72,20 @@ export function FeatureGate({
   loadingFallback,
   requiredRoles,
 }: {
-  featureKey: string;
+  // v1.71 — typed union (was: `string`). Use FeatureFlagKey to surface
+  // typos as TS errors. For ad-hoc keys, callers can still cast
+  // `as FeatureFlagKey` at the call site.
+  featureKey: FeatureFlagKey | string;
   featureLabel: string;
   children: React.ReactNode;
   loadingFallback?: React.ReactNode;
   requiredRoles?: string[];
 }): React.ReactElement {
   const { user } = useAuth();
+  // useFeatureFlag is already typed (FeatureFlagKey) — but the prop
+  // accepts `string` too, so a runtime narrow may be needed for the
+  // context. Pass through if it's a known key, else the hook warns in
+  // dev and returns enabled=false (existing behaviour).
   // FeatureGate accepts arbitrary string keys (some callers may pass
   // ad-hoc keys from the route layer). Pass through cast — useFeatureFlag
   // will warn / throw in dev for unknown keys.

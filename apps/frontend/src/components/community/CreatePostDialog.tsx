@@ -8,6 +8,13 @@ import { useAuthModal } from '../../context/AuthModalContext';
 import { useGcsUpload, type GcsAsset } from '../../hooks/useGcsUpload';
 import { buildGcsTransformedUrl } from '../../utils/gcsTransform';
 
+interface DuplicateMatch {
+  source: string;
+  score: number;
+  // Other fields are server-defined; we only consume these two.
+  [k: string]: unknown;
+}
+
 interface CreatePostDialogProps {
   onClose: () => void;
   onCreated: (post: Post, dupResult?: { isDuplicate: boolean; dupCount: number; faqMatches: number }) => void;
@@ -83,7 +90,7 @@ export default function CreatePostDialog({ onClose, onCreated, prefillTitle = ''
   const [error, setError] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
-  const [duplicateMatch, setDuplicateMatch] = useState<{ isDuplicate: boolean; matches: any[] } | null>(null);
+  const [duplicateMatch, setDuplicateMatch] = useState<{ isDuplicate: boolean; matches: DuplicateMatch[] } | null>(null);
   const [checkingDuplicates, setCheckingDuplicates] = useState(false);
   const [floatAway] = useState(false);
   const duplicateCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -143,7 +150,7 @@ export default function CreatePostDialog({ onClose, onCreated, prefillTitle = ''
     setCheckingDuplicates(true);
     duplicateCheckTimerRef.current = setTimeout(async () => {
       try {
-        const res = await api.post<{ isDuplicate: boolean; matches: any[] }>('/community/check-duplicate', { query: q });
+        const res = await api.post<{ isDuplicate: boolean; matches: DuplicateMatch[] }>('/community/check-duplicate', { query: q });
         setDuplicateMatch(res.data);
       } catch {
         setDuplicateMatch(null);
@@ -164,7 +171,7 @@ export default function CreatePostDialog({ onClose, onCreated, prefillTitle = ''
     // Block only if match is a high-confidence FAQ match (score >= 0.85).
     // Low-confidence / tangential matches are shown as suggestions — posting is allowed.
     const highConfidenceFaqMatch = duplicateMatch?.matches?.find(
-      (m: any) => m.source === 'faq' && m.score >= 0.85
+      (m: DuplicateMatch) => m.source === 'faq' && m.score >= 0.85
     );
     if (highConfidenceFaqMatch) {
       setError('This question is already answered in our FAQ. Please check the FAQ page first.');
@@ -193,7 +200,7 @@ export default function CreatePostDialog({ onClose, onCreated, prefillTitle = ''
       // Show toast with duplicate check result
       const dupCount = duplicateMatch?.matches?.length ?? 0;
       if (dupCount > 0) {
-        const faqMatches = duplicateMatch?.matches?.filter((m: any) => m.source === 'faq').length ?? 0;
+        const faqMatches = duplicateMatch?.matches?.filter((m: DuplicateMatch) => m.source === 'faq').length ?? 0;
         if (faqMatches > 0) {
           showToast(`⚠️ Similar FAQ found — your question has been linked.`, 'warn');
         } else {
@@ -202,7 +209,7 @@ export default function CreatePostDialog({ onClose, onCreated, prefillTitle = ''
       } else {
         showToast(`✅ Your question has been posted to the community!`, 'success');
       }
-      const dupResult = { isDuplicate: duplicateMatch?.isDuplicate ?? false, dupCount, faqMatches: duplicateMatch?.matches?.filter((m: any) => m.source === 'faq').length ?? 0 };
+      const dupResult = { isDuplicate: duplicateMatch?.isDuplicate ?? false, dupCount, faqMatches: duplicateMatch?.matches?.filter((m: DuplicateMatch) => m.source === 'faq').length ?? 0 };
       onCreated(res.data.post, dupResult);
       dialogRef.current?.close();
     } catch (err) {
