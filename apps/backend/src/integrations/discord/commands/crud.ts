@@ -82,7 +82,7 @@ function require_id(id: string | undefined, fn: (id: string) => Promise<crud.Adm
 export const crudCommandData = (() => {
   const builder = new SlashCommandBuilder()
     .setName('crud')
-    .setDescription('[admin] CRUD on FAQs, web pages, documents, programs, batches, golden-tickets, support-tickets, users, feature-flags, audit-logs')
+    .setDescription('[admin] CRUD on FAQs, web pages, docs, programs, batches, tickets, users, flags, audit')
     .setDefaultMemberPermissions(0); // server-side double-check via isAdmin
 
   for (const entity of ENTITIES) {
