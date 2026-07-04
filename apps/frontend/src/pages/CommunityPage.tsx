@@ -6,7 +6,7 @@ import ThreadDetail from '../components/community/ThreadDetail';
 import Button from '../components/ui/Button';
 import { CommunityDoodles } from '../components/ui/PageDoodles';
 import CommunityHealth from '../components/community/CommunityHealth';
-import api, { friendlyError } from '../utils/api';
+import api from '../utils/api';
 import { useAuth } from '../hooks/useAuth';
 import { useAuthGate } from '../context/AuthModalContext';
 import type { Post } from '../types/ui';
@@ -164,7 +164,7 @@ export default function CommunityPage() {
       });
       setSearchResults(res.data.results || []);
     } catch (err) {
-      console.error(friendlyError(err, 'Failed to load posts.'));
+      console.error('Failed to load posts:', err);
       setSearchResults([]);
     } finally {
       setSearchLoading(false);
