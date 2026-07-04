@@ -8,21 +8,40 @@
  * (the previous pattern) caused the v10 SDK to log "express is not instrumented"
  * because route registration happened before the patch was applied.
  *
- * Two Sentry clients are configured here:
- *   - Backend client (SENTRY_DSN): captures HTTP errors, request spans,
+ * Env loading: this file ALSO loads dotenv before reading SENTRY_* vars.
+ * Why: tsx --import runs instrument.ts *before* server.ts's own imports, so
+ * if we relied on server.ts's `import './env.js'` (dotenv) the Sentry DSN
+ * would be empty here. That was a real bug — Sentry.init() would silently
+ * no-op with no DSN and no debug logs. Loading dotenv here fixes the order.
+ *
+ * Single Sentry client (SENTRY_DSN):
+ *   - Captures HTTP errors (via setupExpressErrorHandler in bootstrap/app.ts),
+ *     request spans (expressIntegration), Mongoose spans (mongooseIntegration),
  *     unhandled rejections, and logger.error/alert calls.
- *   - DB client (SENTRY_DB_DSN): captures Mongoose spans only. Falls back to
- *     SENTRY_DSN when SENTRY_DB_DSN is unset.
+ *   - SENTRY_DB_DSN is kept as a fallback only (used when SENTRY_DSN is unset).
+ *     Routing DB spans to a separate Sentry project requires multiple Client
+ *     instances, which Sentry SDK v10 doesn't support cleanly — single project
+ *     + "db" tag filter in the dashboard is the recommended approach.
  *
  * PII is filtered via beforeSend + beforeSendTransaction. sendDefaultPii:false
  * keeps IP + user-agent out of events by default.
  */
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Load .env FIRST so the Sentry env vars below are populated. Mirrors the
+// dotenv config in src/env.ts so behaviour is identical regardless of entry
+// point (server.ts, scripts, tests).
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+
 import * as Sentry from '@sentry/node';
 import { expressIntegration, mongooseIntegration } from '@sentry/node';
 
 const sentryEnabled = process.env.SENTRY_ENABLED !== 'false'; // default on
-const sentryDsn = process.env.SENTRY_DSN;
-const sentryDbDsn = process.env.SENTRY_DB_DSN || sentryDsn;
+const sentryDsn = process.env.SENTRY_DSN || process.env.SENTRY_DB_DSN;
 const sentryEnv = process.env.SENTRY_ENV || process.env.NODE_ENV || 'development';
 const sentryRelease = process.env.SENTRY_RELEASE;
 const sentryDebug = process.env.SENTRY_DEBUG === 'true';
@@ -72,21 +91,6 @@ if (sentryEnabled && sentryDsn) {
       expressIntegration(),
       mongooseIntegration(),
     ],
-    beforeSend: sentryBeforeSend,
-    beforeSendTransaction: sentryBeforeSendTransaction,
-  });
-}
-
-// Separate client for DB spans — only if a different DSN is configured.
-if (sentryEnabled && sentryDbDsn && sentryDbDsn !== sentryDsn) {
-  Sentry.init({
-    dsn: sentryDbDsn,
-    environment: sentryEnv,
-    release: sentryRelease,
-    debug: sentryDebug,
-    sendDefaultPii: false,
-    tracesSampleRate,
-    integrations: [mongooseIntegration()],
     beforeSend: sentryBeforeSend,
     beforeSendTransaction: sentryBeforeSendTransaction,
   });
