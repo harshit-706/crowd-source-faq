@@ -1,21 +1,29 @@
 /**
  * cronManager.ts — central registry for periodic jobs.
  *
- * Phase 3 (auto-answer loop): added a per-job concurrency guard so a
- * slow tick cannot overlap the next tick. The fix mirrors the
- * atomic-write lesson from commit 60c1af0 (findOneAndUpdate over a
- * shared `running` Set) — if a job is already running, the new tick
- * is dropped with a warning instead of stacking a parallel run.
+ * v1.71 — added introspection (listJobs / getJob / triggerOnce).
+ * v1.71+ — added override-aware scheduling + persistent run history.
  *
- * Phase 7 R17: introspection API. The admin Schedule tab needs to
- * surface every registered job's last-run status, last error, and
- * offer a "Run now" button that triggers a single execution through
- * the same concurrency guard the cron tick uses.
+ * Override semantics:
+ *   - On register(), the job's registered intervalMs is the default.
+ *   - On startAll(), cronManager reads CronScheduleOverride from the
+ *     DB for each job. If an override exists:
+ *       - enabled:false → the job's timer is NOT created. Ticks are
+ *         skipped (and recorded as 'skipped' runs for visibility).
+ *       - intervalMs > 0 → the timer uses the override interval.
+ *   - Admin changes via Schedule tab call applyOverride(name, ...)
+ *     which updates the DB AND, if the interval changed, recreates
+ *     the timer with the new interval (no restart needed).
  *
- * Backwards compatible: the public API (register / startAll /
- * stopAll) is unchanged. New methods are additive.
+ * Run history:
+ *   - Every execution (cron tick, admin trigger) writes a CronJobRun
+ *     document. After each write we prune to the last 50 per job
+ *     (configurable via CRON_RUN_HISTORY_LIMIT env var).
  */
+
 import { logger } from '../../utils/http/logger.js';
+import CronScheduleOverride from '../../modules/admin/cron-schedule-override.model.js';
+import CronJobRun from '../../modules/admin/cron-job-run.model.js';
 
 export interface CronJob {
   name: string;
@@ -25,46 +33,72 @@ export interface CronJob {
   startupDelayMs?: number;
 }
 
-/** Lightweight stats the admin UI consumes. Persisted in-memory only. */
 export interface CronJobStats {
   name: string;
-  intervalMs: number;
+  intervalMs: number;        // effective interval (override OR default)
+  defaultIntervalMs: number; // registered default, always the original
+  enabled: boolean;          // effective enabled state
   runOnStartup: boolean;
   startupDelayMs?: number;
-  /** Whether the interval timer is currently scheduled. */
   isScheduled: boolean;
-  /** True while a handler invocation is in flight. */
   isRunning: boolean;
-  /** Last successful run completion (or null if never run). */
   lastRunAt: Date | null;
-  /** Last error message (or null if never errored). */
   lastError: string | null;
-  /** Last error timestamp. */
   lastErrorAt: Date | null;
-  /** Number of times this job has been skipped due to the concurrency lock. */
   skipCount: number;
-  /** Number of times this job has errored. */
   errorCount: number;
+  successCount: number;
 }
 
 interface JobStatsInternal extends CronJobStats {
   handler: () => Promise<unknown>;
 }
 
+export interface OverridePatch {
+  enabled?: boolean;
+  intervalMs?: number;     // 0 = reset to default
+  lastEditedBy: string;
+  note?: string;
+}
+
+const DEFAULT_HISTORY_LIMIT = 50;
+
 export class CronManager {
   private intervals: Map<string, NodeJS.Timeout> = new Map();
   private jobs: CronJob[] = [];
-  // Per-job concurrency lock. A job name is added while its handler
-  // is in-flight; the next tick checks this Set before invoking.
   private running: Set<string> = new Set();
-  // Stats keyed by job name.
   private stats: Map<string, JobStatsInternal> = new Map();
+
+  /** Resolve the override, returning null if no override is stored. */
+  private async loadOverride(name: string): Promise<{ enabled: boolean; intervalMs: number } | null> {
+    try {
+      const doc = await CronScheduleOverride.findOne({ name }).lean();
+      if (!doc) return null;
+      return { enabled: doc.enabled, intervalMs: doc.intervalMs };
+    } catch (err) {
+      logger.warn(`[cronManager] failed to load override for "${name}": ${(err as Error).message}`);
+      return null;
+    }
+  }
+
+  /** Effective interval for a job — override value if set, else registered. */
+  private effectiveInterval(job: CronJob, override: { intervalMs: number } | null): number {
+    if (override && override.intervalMs > 0) return override.intervalMs;
+    return job.intervalMs;
+  }
+
+  /** Effective enabled for a job — override false disables, else true. */
+  private effectiveEnabled(override: { enabled: boolean } | null): boolean {
+    return override ? override.enabled : true;
+  }
 
   register(job: CronJob): void {
     this.jobs.push(job);
     this.stats.set(job.name, {
       name: job.name,
       intervalMs: job.intervalMs,
+      defaultIntervalMs: job.intervalMs,
+      enabled: true,
       runOnStartup: job.runOnStartup ?? false,
       startupDelayMs: job.startupDelayMs,
       isScheduled: false,
@@ -74,30 +108,105 @@ export class CronManager {
       lastErrorAt: null,
       skipCount: 0,
       errorCount: 0,
+      successCount: 0,
       handler: job.handler,
     });
   }
 
-  /**
-   * Wraps a job's handler with the concurrency lock. Returns true if
-   * the work ran, false if it was skipped because the job was
-   * already in flight.
-   */
-  private async runWithLock(job: CronJob): Promise<boolean> {
+  /** Recreate the timer for a job with the given intervalMs. */
+  private setTimer(name: string, intervalMs: number): void {
+    // Clear any existing timer first
+    const existing = this.intervals.get(name);
+    if (existing) {
+      clearInterval(existing);
+    }
+    const job = this.jobs.find((j) => j.name === name);
+    if (!job) return;
+    const interval = setInterval(() => {
+      void this.runWithLock(job, 'cron');
+    }, intervalMs);
+    this.intervals.set(name, interval);
+    const s = this.stats.get(name);
+    if (s) {
+      s.intervalMs = intervalMs;
+      s.isScheduled = true;
+    }
+  }
+
+  /** Persist a CronJobRun document and prune old ones for the same name. */
+  private async recordRun(args: {
+    name: string;
+    startedAt: Date;
+    finishedAt: Date;
+    status: 'success' | 'error' | 'skipped';
+    durationMs: number;
+    error: string | null;
+    triggeredBy: 'cron' | 'admin';
+  }): Promise<void> {
+    try {
+      await CronJobRun.create({
+        name: args.name,
+        startedAt: args.startedAt,
+        finishedAt: args.finishedAt,
+        status: args.status,
+        durationMs: args.durationMs,
+        error: args.error,
+        triggeredBy: args.triggeredBy,
+      });
+      // Prune — keep last N
+      const limit = Number(process.env.CRON_RUN_HISTORY_LIMIT ?? DEFAULT_HISTORY_LIMIT);
+      const total = await CronJobRun.countDocuments({ name: args.name });
+      if (total > limit) {
+        const excess = total - limit;
+        const oldest = await CronJobRun.find({ name: args.name })
+          .sort({ startedAt: 1 })
+          .limit(excess)
+          .select('_id')
+          .lean();
+        if (oldest.length > 0) {
+          await CronJobRun.deleteMany({ _id: { $in: oldest.map((d) => d._id) } });
+        }
+      }
+    } catch (err) {
+      logger.warn(`[cronManager] failed to record run for "${args.name}": ${(err as Error).message}`);
+    }
+  }
+
+  private async runWithLock(job: CronJob, triggeredBy: 'cron' | 'admin'): Promise<boolean> {
+    // Honor disable flag (DB-backed override)
+    const override = await this.loadOverride(job.name);
+    if (!this.effectiveEnabled(override)) {
+      // Job disabled — skip + record
+      const s = this.stats.get(job.name);
+      if (s) s.skipCount++;
+      void this.recordRun({
+        name: job.name,
+        startedAt: new Date(),
+        finishedAt: new Date(),
+        status: 'skipped',
+        durationMs: 0,
+        error: null,
+        triggeredBy,
+      });
+      return false;
+    }
+
     if (this.running.has(job.name)) {
       logger.warn(`[cronManager] job "${job.name}" still running, skipping tick`);
       const s = this.stats.get(job.name);
       if (s) s.skipCount++;
       return false;
     }
+
     this.running.add(job.name);
     const s = this.stats.get(job.name);
     if (s) s.isRunning = true;
+    const startedAt = new Date();
+    let result: 'success' | 'error' = 'success';
+    let errorMsg: string | null = null;
     try {
       await job.handler();
-      if (s) {
-        s.lastRunAt = new Date();
-      }
+      if (s) s.lastRunAt = new Date();
     } catch (e: any) {
       const msg = e?.message ?? String(e);
       logger.error(`[cronManager] Job "${job.name}" failed: ${msg}`);
@@ -106,34 +215,69 @@ export class CronManager {
         s.lastErrorAt = new Date();
         s.errorCount++;
       }
+      result = 'error';
+      errorMsg = msg;
     } finally {
       this.running.delete(job.name);
       if (s) s.isRunning = false;
     }
-    return true;
+
+    const finishedAt = new Date();
+    const durationMs = finishedAt.getTime() - startedAt.getTime();
+    if (s && result === 'success') s.successCount++;
+    void this.recordRun({
+      name: job.name,
+      startedAt,
+      finishedAt,
+      status: result,
+      durationMs,
+      error: errorMsg,
+      triggeredBy,
+    });
+    return result === 'success';
   }
 
-  startAll(): void {
-    for (const job of this.jobs) {
-      // Setup the recurring interval — guarded by runWithLock so a
-      // slow tick can never collide with the next one.
-      const interval = setInterval(() => {
-        void this.runWithLock(job);
-      }, job.intervalMs);
-      this.intervals.set(job.name, interval);
+  async startAll(): Promise<void> {
+    // Load all overrides once at startup
+    const overrides = new Map<string, { enabled: boolean; intervalMs: number }>();
+    try {
+      const docs = await CronScheduleOverride.find({}).lean();
+      for (const doc of docs) overrides.set(doc.name, { enabled: doc.enabled, intervalMs: doc.intervalMs });
+    } catch (err) {
+      logger.warn(`[cronManager] failed to load overrides at startup: ${(err as Error).message}`);
+    }
 
+    for (const job of this.jobs) {
+      const override = overrides.get(job.name) ?? null;
       const s = this.stats.get(job.name);
+      const enabled = this.effectiveEnabled(override);
+      const interval = this.effectiveInterval(job, override);
+      if (s) {
+        s.enabled = enabled;
+        s.intervalMs = interval;
+      }
+
+      if (!enabled) {
+        // Don't create a timer for disabled jobs. They can still be
+        // triggered manually via triggerOnce() — that path also checks
+        // enabled via runWithLock.
+        logger.info(`[cronManager] job "${job.name}" disabled by override — not scheduling`);
+        continue;
+      }
+
+      const intervalHandle = setInterval(() => {
+        void this.runWithLock(job, 'cron');
+      }, interval);
+      this.intervals.set(job.name, intervalHandle);
       if (s) s.isScheduled = true;
 
-      // Startup execution if required — same guard applied.
       if (job.runOnStartup) {
         if (job.startupDelayMs) {
           setTimeout(() => {
-            void this.runWithLock(job);
+            void this.runWithLock(job, 'cron');
           }, job.startupDelayMs);
         } else {
-          // Run immediately (asynchronously, fire-and-forget)
-          void this.runWithLock(job);
+          void this.runWithLock(job, 'cron');
         }
       }
     }
@@ -149,22 +293,16 @@ export class CronManager {
     logger.info('[cronManager] All cron intervals cleared.');
   }
 
-  // ─── Introspection API (Phase 7 R17) ───────────────────────────────────
+  // ─── Introspection ────────────────────────────────────────────────────
 
-  /**
-   * Return a snapshot of every registered job's stats. The handler
-   * function itself is stripped from the public payload.
-   */
   listJobs(): CronJobStats[] {
     return Array.from(this.stats.values()).map((s) => {
-      // Destructure to omit the handler from the public payload.
       const { handler: _handler, ...publicStats } = s;
       void _handler;
       return publicStats;
     });
   }
 
-  /** Stats for a single job, or null if not registered. */
   getJob(name: string): CronJobStats | null {
     const s = this.stats.get(name);
     if (!s) return null;
@@ -173,13 +311,7 @@ export class CronManager {
     return publicStats;
   }
 
-  /**
-   * Trigger a single out-of-band execution of a registered job.
-   * Uses the same concurrency lock as the cron tick, so an admin
-   * "Run now" can't collide with an in-flight scheduled run.
-   * Returns true if the job started, false if it's already running
-   * or the name is unknown.
-   */
+  /** Returns true if started, false if name unknown OR already running. */
   triggerOnce(name: string): boolean {
     const job = this.jobs.find((j) => j.name === name);
     if (!job) return false;
@@ -187,8 +319,128 @@ export class CronManager {
       logger.warn(`[cronManager] triggerOnce("${name}") skipped — job already running`);
       return false;
     }
-    void this.runWithLock(job);
+    void this.runWithLock(job, 'admin');
     return true;
+  }
+
+  // ─── Override application (called from /admin/schedule route) ────────
+
+  /**
+   * Apply an override change. Persists to the DB and, if the effective
+   * interval changed, recreates the timer with the new cadence.
+   *
+   * If the job becomes disabled, the timer is cleared (admin can still
+   * trigger manually — runWithLock will honor the override).
+   *
+   * If the job becomes enabled after being disabled, the timer is
+   * re-created at the override-or-default interval.
+   */
+  async applyOverride(name: string, patch: OverridePatch): Promise<void> {
+    const job = this.jobs.find((j) => j.name === name);
+    if (!job) throw new Error(`Unknown job: ${name}`);
+    const s = this.stats.get(name);
+    if (!s) throw new Error(`Unknown job: ${name}`);
+
+    // Compute the previous effective state
+    const previousOverride = await this.loadOverride(name);
+    const previousEnabled = this.effectiveEnabled(previousOverride);
+    const previousInterval = this.effectiveInterval(job, previousOverride);
+
+    // Persist
+    const set: Record<string, unknown> = {
+      name,
+      lastEditedBy: patch.lastEditedBy,
+      lastEditedAt: new Date(),
+    };
+    if (patch.enabled !== undefined) set.enabled = patch.enabled;
+    if (patch.intervalMs !== undefined) set.intervalMs = patch.intervalMs;
+    if (patch.note !== undefined) set.note = patch.note;
+    await CronScheduleOverride.findOneAndUpdate(
+      { name },
+      { $set: set },
+      { upsert: true, new: true },
+    );
+
+    // Reload to get final values
+    const newOverride = await this.loadOverride(name);
+    const newEnabled = this.effectiveEnabled(newOverride);
+    const newInterval = this.effectiveInterval(job, newOverride);
+
+    // Update stats
+    s.enabled = newEnabled;
+    s.intervalMs = newInterval;
+
+    // Adjust timer if needed
+    if (previousEnabled !== newEnabled) {
+      if (newEnabled) {
+        this.setTimer(name, newInterval);
+        logger.info(`[cronManager] job "${name}" enabled (interval=${newInterval}ms)`);
+      } else {
+        const existing = this.intervals.get(name);
+        if (existing) clearInterval(existing);
+        this.intervals.delete(name);
+        s.isScheduled = false;
+        logger.info(`[cronManager] job "${name}" disabled (timer cleared)`);
+      }
+    } else if (newEnabled && previousInterval !== newInterval) {
+      // Same enabled state, different interval — recreate timer
+      this.setTimer(name, newInterval);
+      logger.info(`[cronManager] job "${name}" interval changed: ${previousInterval}ms → ${newInterval}ms`);
+    }
+  }
+
+  /**
+   * Reset an override back to defaults (delete the override doc).
+   * Timer is recreated with the registered interval if the job is
+   * currently enabled.
+   */
+  async resetOverride(name: string): Promise<void> {
+    const job = this.jobs.find((j) => j.name === name);
+    if (!job) throw new Error(`Unknown job: ${name}`);
+    const s = this.stats.get(name);
+    if (!s) throw new Error(`Unknown job: ${name}`);
+
+    await CronScheduleOverride.deleteOne({ name });
+    s.enabled = true;
+    s.intervalMs = job.intervalMs;
+
+    // Recreate timer at default cadence
+    if (this.intervals.has(name)) {
+      this.setTimer(name, job.intervalMs);
+    } else {
+      // Was previously disabled — re-enable timer
+      this.setTimer(name, job.intervalMs);
+    }
+    logger.info(`[cronManager] job "${name}" override reset to defaults (${job.intervalMs}ms)`);
+  }
+
+  /** Return the persisted override for one job (or null). */
+  async getOverride(name: string): Promise<{ enabled: boolean; intervalMs: number; lastEditedBy: string; lastEditedAt: Date; note?: string } | null> {
+    const doc = await CronScheduleOverride.findOne({ name }).lean();
+    if (!doc) return null;
+    return {
+      enabled: doc.enabled,
+      intervalMs: doc.intervalMs,
+      lastEditedBy: doc.lastEditedBy,
+      lastEditedAt: doc.lastEditedAt,
+      note: doc.note,
+    };
+  }
+
+  /** Return overrides for ALL jobs (so the UI can show defaults + current overrides). */
+  async getAllOverrides(): Promise<Map<string, { enabled: boolean; intervalMs: number; lastEditedBy: string; lastEditedAt: Date; note?: string }>> {
+    const out = new Map<string, { enabled: boolean; intervalMs: number; lastEditedBy: string; lastEditedAt: Date; note?: string }>();
+    const docs = await CronScheduleOverride.find({}).lean();
+    for (const doc of docs) {
+      out.set(doc.name, {
+        enabled: doc.enabled,
+        intervalMs: doc.intervalMs,
+        lastEditedBy: doc.lastEditedBy,
+        lastEditedAt: doc.lastEditedAt,
+        note: doc.note,
+      });
+    }
+    return out;
   }
 }
 

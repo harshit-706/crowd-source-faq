@@ -147,8 +147,8 @@ export async function startup(config: any): Promise<void> {
     logger.info('[server] document pipeline offline (disabled by feature flag or not configured)');
   }
 
-  // Start cron manager
-  cronManager.startAll();
+  // Start cron manager (async — reads overrides from DB before scheduling)
+  await cronManager.startAll();
 }
 
 export async function stopAllSchedulers(): Promise<void> {
