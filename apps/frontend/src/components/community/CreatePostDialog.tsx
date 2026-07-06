@@ -9,6 +9,12 @@ import { useGcsUpload, type GcsAsset } from '../../hooks/useGcsUpload';
 import { buildGcsTransformedUrl } from '../../utils/gcsTransform';
 import { useBatch } from '../../context/BatchContext';
 import { useCategories } from '../explore/usePublicFaqApi';
+import {
+  communityTemplateCard,
+  communityTemplateLabel,
+  communityTemplateIcon,
+  communityToastWarn,
+} from '../../styles/style_config';
 
 function CategoryDropdown({
   value,
@@ -430,12 +436,12 @@ export default function CreatePostDialog({ onClose, onCreated, prefillTitle = ''
                         dialogRef.current?.close();
                         navigate(href);
                       }}
-                      className="w-full text-left flex items-start gap-2 px-2.5 py-1.5 rounded-lg bg-card/70 hover:bg-card border border-amber-200 hover:border-amber-400 hover:shadow-sm transition-all group cursor-pointer"
+                      className={communityTemplateCard}
                     >
                       <span className="shrink-0 mt-0.5">{icon}</span>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-700">{label}</span>
+                          <span className={communityTemplateLabel}>{label}</span>
                           {m.score && (
                             <span className="text-[10px] text-ink-faint">{(m.score * 100).toFixed(0)}% match</span>
                           )}
@@ -444,7 +450,7 @@ export default function CreatePostDialog({ onClose, onCreated, prefillTitle = ''
                           "{m.question || m.title}"
                         </p>
                       </div>
-                      <svg className="shrink-0 mt-1 w-3 h-3 text-ink-faint group-hover:text-amber-600 group-hover:translate-x-0.5 transition-all" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <svg className={communityTemplateIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M9 18l6-6-6-6"/>
                       </svg>
                     </button>
@@ -569,7 +575,7 @@ export default function CreatePostDialog({ onClose, onCreated, prefillTitle = ''
           {toast && (
             <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] px-5 py-3 rounded-xl text-sm font-medium shadow-float border animate-fade-in
               ${toast.type === 'success' ? 'bg-accent/10 border-accent/30 text-accent' :
-                toast.type === 'warn' ? 'bg-amber-50 border-amber-200 text-amber-700' :
+                toast.type === 'warn' ? communityToastWarn :
                 'bg-accent/10 border-accent/30 text-accent'}`}>
               {toast.msg}
             </div>
