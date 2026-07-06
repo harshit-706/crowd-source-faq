@@ -144,10 +144,6 @@ export const badgeDanger     = 'inline-flex items-center gap-1 px-2 py-0.5 round
 export const badgeInfo       = 'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-info/10 text-info border border-info/20';
 export const badgeNeutral    = 'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-mist text-ink-soft border border-border';
 
-export const voteUp          = 'inline-flex items-center gap-1.5 text-xs px-3.5 py-1.5 rounded-full border transition-all duration-200 border-accent/40 bg-accent-light text-accent';
-export const voteDown        = 'inline-flex items-center gap-1.5 text-xs px-3.5 py-1.5 rounded-full border transition-all duration-200 border-danger/40 bg-danger-light text-danger';
-export const voteUpIdle      = 'inline-flex items-center gap-1.5 text-xs px-3.5 py-1.5 rounded-full border border-border text-ink-faint transition-all duration-200 hover:border-accent/40 hover:text-accent';
-export const voteDownIdle    = 'inline-flex items-center gap-1.5 text-xs px-3.5 py-1.5 rounded-full border border-border text-ink-faint transition-all duration-200 hover:border-danger/40 hover:text-danger';
 
 /* ── 6. Feedback ──────────────────────────────────────────────────
  * Banners, toasts, alerts. */
@@ -202,3 +198,72 @@ export const tableTh         = 'px-3 py-2.5 text-left text-[10px] font-semibold 
 export const tableTd         = 'px-3 py-3 text-sm text-ink';
 export const tableTr         = 'border-b border-border/50 last:border-0 hover:bg-mist transition-colors';
 export const tableTrLast     = 'hover:bg-mist transition-colors';
+
+/* ── 13. Result / answer surfaces ─────────────────────────────────
+ * Used by FAQ result cards, search result cards, answer panels. */
+
+export const resultCardCollapsed = 'border border-border/70 bg-card/80 hover:bg-cream rounded-2xl transition-all duration-300 overflow-hidden';
+export const resultCardExpanded  = 'border border-accent/30 bg-cream rounded-2xl transition-all duration-300 overflow-hidden';
+
+export const resultMetaSource    = 'inline-flex items-center px-2.5 py-0.5 rounded-full bg-mist text-ink-soft font-semibold uppercase tracking-wider';
+export const resultMetaCategory  = 'inline-flex items-center px-2.5 py-0.5 rounded-full bg-accent-light text-accent font-semibold uppercase tracking-wider';
+
+export const resultBody          = 'mt-1.5 text-xs text-ink-soft leading-relaxed line-clamp-2';
+export const resultTitle         = 'text-sm font-semibold text-ink leading-snug';
+
+export const resultHeaderFaq     = 'rounded-xl bg-accent-light border border-accent/15 p-4';
+export const resultHeaderCommunity = 'rounded-xl bg-success-light border border-success/15 p-4';
+
+export const resultFaqLabel      = 'text-[11px] font-semibold text-accent mb-2 uppercase tracking-wide';
+export const resultCommunityLabel = 'text-[11px] font-semibold text-success mb-2 uppercase tracking-wide';
+
+export const resultBodyFaq       = 'text-sm text-ink/75 leading-relaxed whitespace-pre-wrap';
+export const resultBodyFaqShort  = 'text-sm text-ink/75 leading-relaxed';
+export const resultBodyCommunity = 'text-sm text-ink/70 leading-relaxed';
+
+/* ── 14. Vote / feedback pills ────────────────────────────────────
+ * Round pill buttons for "Was this helpful?" style votes. */
+
+export const votePillBase       = 'inline-flex items-center gap-1.5 text-xs px-3.5 py-1.5 rounded-full border transition-all duration-200 disabled:cursor-default';
+export const voteUp             = 'border-accent/40 bg-accent-light text-accent';
+export const voteDown           = 'border-danger/40 bg-danger-light text-danger';
+export const voteUpIdle         = 'border-border text-ink-faint hover:border-accent/40 hover:text-accent';
+export const voteDownIdle       = 'border-border text-ink-faint hover:border-danger/40 hover:text-danger';
+
+/* ── 15. Suggestion / inline form ────────────────────────────────
+ * Used inside ResultItem for "Suggest better answer" forms. */
+
+export const suggestForm         = 'mt-3 bg-mist/60 border border-border/70 rounded-2xl p-4 space-y-3 animate-fade-in';
+export const suggestLabel        = 'text-xs font-semibold text-ink';
+export const suggestTextarea     = 'w-full text-xs p-3 rounded-xl border border-border bg-card focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent resize-y';
+export const suggestError        = 'text-[11px] text-danger';
+export const suggestSuccess      = 'text-[11px] text-success';
+
+export const suggestBtnCancel    = 'px-3 py-1.5 rounded-full border border-border bg-card text-[11px] font-semibold text-ink-soft hover:bg-cream transition-colors';
+export const suggestBtnSubmit    = 'px-4 py-1.5 rounded-full bg-accent text-accent-text text-[11px] font-semibold hover:bg-accent-dark transition-colors disabled:opacity-50';
+
+/* ── 16. Suggestion CTA (link-style) ───────────────────────────── */
+
+export const suggestCta         = 'inline-flex items-center gap-1 text-xs font-semibold text-ink-soft hover:text-accent transition-colors';
+export const suggestCtaAccent    = 'inline-flex items-center gap-1 text-xs font-semibold text-accent hover:text-accent-dark hover:underline transition-colors';
+export const suggestCtaFaint     = 'inline-flex items-center gap-1 text-xs text-ink-faint hover:text-ink-soft transition-colors';
+
+/* ── 17. Confidence tag (search results) ─────────────────────────
+ * The "High/Medium/Low Confidence" pill on each search result. */
+
+export const confidencePill       = 'inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold';
+export const confidenceHigh       = 'bg-success-light text-success';
+export const confidenceMedium     = 'bg-warning-light text-warning';
+export const confidenceLow        = 'bg-mist text-ink-faint';
+
+/* ── 18. Search bar input variants ─────────────────────────────────
+ * The two input styles used inside SearchBar.tsx — the "default"
+ * large hero search and the "compact" navbar search. Both kept
+ * theme-token-driven so they re-skin with the rest of the UI. */
+
+export const searchInputDefault = 'w-full pl-12 pr-32 py-5 sm:py-[22px] rounded-[26px] border border-border bg-card text-sm sm:text-base text-ink placeholder-ink-faint focus:outline-none focus:border-accent focus:bg-card transition-all duration-300 shadow-[0_14px_34px_rgba(31,41,51,0.07)]';
+export const searchInputCompact = 'w-full bg-mist border border-border/60 text-ink text-sm rounded-[14px] pl-10 pr-3 py-1.5 outline-none focus:bg-card focus:border-accent/40 focus:ring-2 focus:ring-accent/10 transition-all placeholder-ink-faint';
+
+/* ── 19. Search bar suggestion list item ────────────────────────── */
+
+export const searchSuggestionItem = 'w-full text-left px-5 py-3.5 text-sm text-ink hover:bg-cream/60 transition-colors duration-150 border-b border-border/30 last:border-0 flex items-center gap-3';
