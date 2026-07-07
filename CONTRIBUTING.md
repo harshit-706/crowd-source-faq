@@ -33,11 +33,11 @@ Required env vars: `MONGODB_URI`, `JWT_SECRET`, at least one AI provider key (`A
 
 ## Workflow
 
-1. Find or open an issue describing the change.
+1. Find or open an issue describing the change. **Use the issue templates** at `.github/ISSUE_TEMPLATE/` (bug_report, feature_request) — they ask the questions we need answered to act on the issue. Freeform / blank issues are disabled (see `config.yml`).
 2. Branch from `main` with a descriptive name (`fix/handle-empty-transcript`, `feat/zoom-retry-dlq`, `docs/architecture-overview`).
 3. Make the change. **One logical change per PR.** No unrelated refactors.
 4. Run quality checks locally (`tsc --noEmit` in both `apps/backend/` and `apps/frontend/`, plus tests).
-5. Open a PR targeting `main`. Reference the issue with `Closes #N` or `Refs #N`.
+5. Open a PR targeting `main`. Use the PR template at `.github/PULL_REQUEST_TEMPLATE.md` — it pre-fills the CI checklist. Reference the issue with `Closes #N` or `Refs #N`.
 6. Address review feedback. Approval + green CI = merge.
 
 ## Pull Request Quality Bar
