@@ -480,6 +480,14 @@ export const communityUpvoteActive     = 'text-accent';
 export const communityUpvoteIdle       = 'text-ink-faint hover:text-accent';
 export const communityUpvotePillActive = 'text-accent bg-accent/10';
 export const communityUpvotePillIdle   = 'text-ink-faint hover:text-accent hover:bg-accent/10';
+export const communityDownvotePillActive = 'text-accent bg-accent/10';
+export const communityDownvotePillIdle   = 'text-ink-faint hover:text-accent hover:bg-accent/10';
+
+/* Comment-depth badge ("↳ depth 2"). Used in CommentNode on nested
+ * replies. Wraps the depth indicator with a faint border + tint that
+ * reuses the thread-color at low opacity (so deeper replies show the
+ * same accent as their thread's left bar). */
+export const communityThreadDepth      = 'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border border-accent/30 text-accent bg-accent/10 text-[10px] font-medium';
 
 export const communityFirstResponder   = 'inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-warning/10 border border-warning/30 text-warning text-[10px] font-bold';
 export const communityDifficultyEasy   = 'bg-success/10 text-success border border-success/30';

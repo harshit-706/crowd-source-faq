@@ -4,7 +4,10 @@ import { idMatches } from '../../utils/idMatch';
 import Avatar from '../ui/Avatar';
 import Badge from '../ui/Badge';
 import {
+  communityDownvotePillActive,
+  communityDownvotePillIdle,
   communityFirstResponder,
+  communityThreadDepth,
   communityUpvoteActive,
   communityUpvoteIdle,
   communityUpvotePillActive,
@@ -314,7 +317,7 @@ export default function CommentNode({
                   <span className="text-[10px] text-ink-faint">·</span>
                   <span className="text-[10px] text-ink-faint">{formatDate(comment.createdAt)}</span>
                   {depth > 0 && (
-                    <span className={`text-[10px] font-medium ml-1 px-1.5 py-0.5 rounded-full border ${color.replace('border-', 'border-')} ${color.replace('border-', 'text-')} ${color.replace('border-', 'bg-')}/10`}>
+                    <span className={communityThreadDepth}>
                       ↳ depth {depth}
                     </span>
                   )}
@@ -331,7 +334,7 @@ export default function CommentNode({
                     {hasUpvoted ? '↑ Upvoted' : '↑ Upvote'}
                   </button>
                   <button onClick={() => !hasDownvoted && doDownvote()}
-                    className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium transition-all ${hasDownvoted ? 'text-accent bg-accent/100/10' : 'text-ink-faint hover:text-accent hover:bg-accent/100/10'}`}>
+                    className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium transition-all ${hasDownvoted ? communityDownvotePillActive : communityDownvotePillIdle}`}>
                     {hasDownvoted ? '↓ Downvoted' : '↓ Downvote'}
                   </button>
                   {!maxDepth && (

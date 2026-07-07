@@ -113,8 +113,6 @@ export function BatchSwitcher({
       >
         <LayersIcon className="text-accent" />
         <span className="truncate max-w-[140px] sm:max-w-[200px]">{currentBatch.name}</span>
-        <span className="text-ink-faint">·</span>
-        <span className={`text-ink-faint text-[10px] ${textXsLabel}`}>{currentBatch.faqCount}</span>
         <svg
           className={`text-ink-faint transition-transform ${open ? 'rotate-180' : ''}`}
           width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
