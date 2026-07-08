@@ -28,6 +28,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../../utils/api';
+import { createPortal } from 'react-dom';
 import { useProgram } from '../../context/ProgramContext';
 import { resolveAssetUrl } from '../../utils/publicUrl';
 import { inlineDangerBanner, communityToastWarn, warningBorder } from '../../styles/style_config';
@@ -41,6 +42,8 @@ interface Resource {
   description: string;
   url: string;
   completionThreshold: number;
+  publicId?: string | null;
+  pageCount?: number | null;
 }
 
 interface CompletionMap {
@@ -70,7 +73,7 @@ function safeResourceUrl(value: string | undefined | null): string | null {
   // Allow http(s), mailto, blob (rare but legitimate), and data: for
   // small embedded resources. Block everything else — most importantly
   // javascript: and vbscript:.
-  if (/^(https?:|mailto:|blob:|data:image\/)/i.test(v)) return v;
+  if (/^(\/(?!\/)|https?:|mailto:|blob:|data:image\/)/i.test(v)) return v;
   return null;
 }
 
@@ -382,8 +385,57 @@ function VideoRow({ resource, completed, onComplete }: RowProps): React.ReactEle
 function PdfRow({ resource, completed, onComplete }: RowProps): React.ReactElement {
   const threshold = Math.max(5, resource.completionThreshold);
   const { elapsed, start } = useElapsedTimer(true, threshold, onComplete);
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalPages = resource.pageCount || 1;
+
+  // Start the viewing timer on mount for custom viewer
+  useEffect(() => {
+    start();
+  }, [start]);
+
+  const buildPageUrl = (url: string, pageNum: number) => {
+    const base = url.replace(/\.pdf$/i, '.png');
+    const marker = '/upload/';
+    const idx = base.indexOf(marker);
+    if (idx === -1) return base;
+    return `${base.slice(0, idx + marker.length)}pg_${pageNum}/${base.slice(idx + marker.length)}`;
+  };
+
+  const handlePrev = () => {
+    setCurrentPage((p) => Math.max(1, p - 1));
+  };
+
+  const handleNext = () => {
+    setCurrentPage((p) => Math.min(totalPages, p + 1));
+  };
+
+  const isCloudinary = !!(resource.publicId && resource.url.startsWith('https://res.cloudinary.com/'));
+
+  if (!isCloudinary) {
+    return (
+      <div className="space-y-2">
+        <HeaderRow
+          resource={resource}
+          completed={completed}
+          children={
+            <span className="text-[11px] text-ink-soft font-mono">
+              {elapsed}s / {threshold}s
+            </span>
+          }
+        />
+        <div
+          className="rounded-lg border border-border overflow-hidden bg-mist/30 h-[480px]"
+          onMouseEnter={start}
+          onTouchStart={start}
+        >
+          <iframe src={resource.url} title={resource.title} className="w-full h-full" />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <HeaderRow
         resource={resource}
         completed={completed}
@@ -393,12 +445,65 @@ function PdfRow({ resource, completed, onComplete }: RowProps): React.ReactEleme
           </span>
         }
       />
-      <div
-        className="rounded-lg border border-border overflow-hidden bg-mist/30 h-[480px]"
+      
+      <div 
+        className="relative flex flex-col items-center rounded-xl border border-border bg-card shadow-lg overflow-hidden"
         onMouseEnter={start}
         onTouchStart={start}
       >
-        <iframe src={resource.url} title={resource.title} className="w-full h-full" />
+        {/* Main Document Page Image */}
+        <div className="w-full flex items-center justify-center p-6 bg-mist/10 min-h-[500px] sm:min-h-[600px]">
+          <img
+            key={currentPage}
+            src={buildPageUrl(resource.url, currentPage)}
+            alt={`${resource.title} - Page ${currentPage}`}
+            className="max-h-[700px] w-auto object-contain rounded-md shadow-md border border-border/50 select-none transition-all duration-300"
+          />
+        </div>
+
+        {/* Navigation & Controls */}
+        <div className="w-full border-t border-border/80 px-4 py-3 bg-[rgb(var(--bg-primary-rgb))]/90 backdrop-blur-md flex items-center justify-between gap-4">
+          <button
+            type="button"
+            onClick={handlePrev}
+            disabled={currentPage === 1}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-border/60 hover:bg-mist/40 active:scale-95 disabled:opacity-40 disabled:pointer-events-none transition-all"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m15 18-6-6 6-6"/>
+            </svg>
+            Prev
+          </button>
+
+          <div className="flex items-center gap-2">
+            <select
+              value={currentPage}
+              onChange={(e) => setCurrentPage(Number(e.target.value))}
+              className="bg-bg border border-border/80 rounded-md px-2.5 py-1 text-xs font-semibold font-mono text-ink focus:outline-none focus:ring-1 focus:ring-accent"
+            >
+              {Array.from({ length: totalPages }, (_, i) => (
+                <option key={i + 1} value={i + 1}>
+                  Page {i + 1}
+                </option>
+              ))}
+            </select>
+            <span className="text-xs text-ink-soft">
+              of {totalPages}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleNext}
+            disabled={currentPage === totalPages}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-border/60 hover:bg-mist/40 active:scale-95 disabled:opacity-40 disabled:pointer-events-none transition-all"
+          >
+            Next
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m9 18 6-6-6-6"/>
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -445,36 +550,77 @@ function SvgRow({ resource, completed, onComplete }: RowProps): React.ReactEleme
   const threshold = Math.max(3, resource.completionThreshold);
   const { elapsed, start } = useElapsedTimer(true, threshold, onComplete);
 
-  // v1.70: Cloudinary-hosted SVGs are served as direct image URLs.
-  // We render them as <img> rather than fetch+inline so the browser
-  // handles caching, CORS, and MIME-type security headers natively.
   const [imgError, setImgError] = useState<string | null>(null);
-
-  const containerRef = React.useRef<HTMLDivElement | null>(null);
   const [scale, setScale] = useState<number>(1);
   const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [isExpanded, setIsExpanded] = useState<boolean>(false);
+  const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
+  const [containerHeight, setContainerHeight] = useState<string>('24rem');
+
+  const containerRef = React.useRef<HTMLDivElement | null>(null);
+  const expandedContainerRef = React.useRef<HTMLDivElement | null>(null);
+
   const dragStartRef = React.useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number }>({
     x: 0, y: 0, scrollLeft: 0, scrollTop: 0,
   });
 
-  // Non-passive wheel event listener for Ctrl+Scroll zoom.
+  // Calculate and apply optimal scale/height to fit width of container
+  const fitWidth = useCallback(() => {
+    if (!dimensions) return;
+    const container = isExpanded ? expandedContainerRef.current : containerRef.current;
+    if (!container) return;
+    const containerWidth = container.clientWidth;
+    const targetWidth = containerWidth - 32;
+    const targetScale = targetWidth / dimensions.width;
+    
+    setScale(targetScale);
+    
+    if (!isExpanded) {
+      const targetHeight = dimensions.height * targetScale;
+      // Cap height between 320px and 720px
+      const finalHeight = Math.min(720, Math.max(320, targetHeight));
+      setContainerHeight(`${finalHeight}px`);
+    }
+    
+    container.scrollLeft = 0;
+    container.scrollTop = 0;
+  }, [dimensions, isExpanded]);
+
+  // Recalculate optimal width-fitting scale on resize or fullscreen toggle
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
+    if (dimensions) {
+      const timer = setTimeout(() => {
+        fitWidth();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isExpanded, dimensions, fitWidth]);
+
+  // Non-passive wheel event listener for Ctrl+Scroll zoom on both containers.
+  useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
         const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-        setScale((s) => Math.max(0.25, Math.min(8, s * factor)));
+        setScale((s) => Math.max(0.1, Math.min(8, s * factor)));
       }
     };
-    el.addEventListener('wheel', handleWheel, { passive: false });
-    return () => { el.removeEventListener('wheel', handleWheel); };
-  }, []);
 
-  const onPointerDown = (e: React.PointerEvent): void => {
+    const el1 = containerRef.current;
+    if (el1) el1.addEventListener('wheel', handleWheel, { passive: false });
+
+    const el2 = expandedContainerRef.current;
+    if (el2) el2.addEventListener('wheel', handleWheel, { passive: false });
+
+    return () => {
+      if (el1) el1.removeEventListener('wheel', handleWheel);
+      if (el2) el2.removeEventListener('wheel', handleWheel);
+    };
+  }, [isExpanded]);
+
+  const onPointerDownGeneric = (e: React.PointerEvent, ref: React.RefObject<HTMLDivElement | null>): void => {
     if (e.pointerType !== 'mouse' || e.button !== 0) return;
-    const el = containerRef.current;
+    const el = ref.current;
     if (!el) return;
     setIsDragging(true);
     dragStartRef.current = {
@@ -483,23 +629,45 @@ function SvgRow({ resource, completed, onComplete }: RowProps): React.ReactEleme
     };
     el.setPointerCapture(e.pointerId);
   };
-  const onPointerMove = (e: React.PointerEvent): void => {
+
+  const onPointerMoveGeneric = (e: React.PointerEvent, ref: React.RefObject<HTMLDivElement | null>): void => {
     if (!isDragging) return;
-    const el = containerRef.current;
+    const el = ref.current;
     if (!el) return;
     el.scrollLeft = dragStartRef.current.scrollLeft - (e.clientX - dragStartRef.current.x);
     el.scrollTop = dragStartRef.current.scrollTop - (e.clientY - dragStartRef.current.y);
   };
-  const onPointerUp = (e: React.PointerEvent): void => {
+
+  const onPointerUpGeneric = (e: React.PointerEvent, ref: React.RefObject<HTMLDivElement | null>): void => {
     if (!isDragging) return;
     setIsDragging(false);
-    const el = containerRef.current;
-    if (el) { try { el.releasePointerCapture(e.pointerId); } catch { /* ignore */ } }
+    const el = ref.current;
+    if (el) {
+      try { el.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+    }
   };
-  const reset = (): void => {
-    setScale(1);
-    const el = containerRef.current;
-    if (el) { el.scrollLeft = 0; el.scrollTop = 0; }
+
+  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    const w = img.naturalWidth || img.clientWidth || 800;
+    const h = img.naturalHeight || img.clientHeight || 400;
+    setDimensions({ width: w, height: h });
+  };
+
+  const handleDoubleClick = () => {
+    if (!dimensions) return;
+    const container = isExpanded ? expandedContainerRef.current : containerRef.current;
+    if (!container) return;
+    const containerWidth = container.clientWidth;
+    const targetWidth = containerWidth - 32;
+    const fitScale = targetWidth / dimensions.width;
+
+    // Toggle between fit-to-width and 1.25x zoom for details
+    if (Math.abs(scale - fitScale) < 0.05) {
+      setScale(1.25);
+    } else {
+      setScale(fitScale);
+    }
   };
 
   return (
@@ -513,50 +681,101 @@ function SvgRow({ resource, completed, onComplete }: RowProps): React.ReactEleme
           </span>
         }
       />
+      
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 text-[10px] text-ink-faint">
-          <span>Ctrl+Scroll to zoom{scale !== 1 ? ` · ${Math.round(scale * 100)}%` : ''}</span>
+          <span>Double-click image to zoom · Ctrl+Scroll to zoom {scale !== 1 ? `· ${Math.round(scale * 100)}%` : ''}</span>
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => setScale((s) => Math.max(0.25, s / 1.15))}
-            className="text-[10px] text-ink-soft hover:text-ink border border-border px-1.5 py-0.5 rounded bg-bg-card hover:bg-bg-pill transition-colors">
+          <button
+            type="button"
+            onClick={() => setScale((s) => Math.max(0.1, s / 1.15))}
+            className="text-[10px] text-ink-soft hover:text-ink border border-border px-1.5 py-0.5 rounded bg-bg-card hover:bg-bg-pill transition-colors"
+          >
             Zoom Out
           </button>
           <span className="text-[10px] text-ink-soft font-mono w-10 text-center">{Math.round(scale * 100)}%</span>
-          <button type="button" onClick={() => setScale((s) => Math.min(8, s * 1.15))}
-            className="text-[10px] text-ink-soft hover:text-ink border border-border px-1.5 py-0.5 rounded bg-bg-card hover:bg-bg-pill transition-colors">
+          <button
+            type="button"
+            onClick={() => setScale((s) => Math.min(8, s * 1.15))}
+            className="text-[10px] text-ink-soft hover:text-ink border border-border px-1.5 py-0.5 rounded bg-bg-card hover:bg-bg-pill transition-colors"
+          >
             Zoom In
           </button>
-          <button type="button" onClick={reset}
-            className="text-[10px] text-ink-soft hover:text-ink underline ml-1">Reset</button>
+          <button
+            type="button"
+            onClick={fitWidth}
+            className="text-[10px] text-ink-soft hover:text-ink underline ml-1"
+          >
+            Fit Width
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsExpanded(true)}
+            className="flex items-center gap-1 text-[10px] text-accent hover:underline ml-2"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 3h6v6"/>
+              <path d="M9 21H3v-6"/>
+              <path d="M21 3l-7 7M3 21l7-7"/>
+            </svg>
+            Fullscreen
+          </button>
         </div>
       </div>
+
       <div
         ref={containerRef}
-        className="rounded-lg border border-border bg-bg overflow-auto select-none"
-        style={{ height: '24rem', cursor: isDragging ? 'grabbing' : 'grab' }}
+        className="rounded-lg border border-border bg-bg overflow-auto select-none relative flex items-center justify-center"
+        style={{
+          height: containerHeight,
+          cursor: isDragging ? 'grabbing' : 'grab',
+          backgroundImage: 'radial-gradient(rgba(100, 110, 120, 0.08) 1.2px, transparent 0)',
+          backgroundSize: '16px 16px',
+          transition: 'height 0.2s ease-out',
+        }}
         onMouseEnter={start}
         onTouchStart={start}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
+        onPointerDown={(e) => onPointerDownGeneric(e, containerRef)}
+        onPointerMove={(e) => onPointerMoveGeneric(e, containerRef)}
+        onPointerUp={(e) => onPointerUpGeneric(e, containerRef)}
+        onPointerCancel={(e) => onPointerUpGeneric(e, containerRef)}
       >
-        {imgError ? null : (
-          <img
-            src={resource.url}
-            alt={resource.title}
-            className="yaksha-svg-pan"
-            style={{
-              width: `${100 * scale}%`,
-              height: 'auto',
-              display: 'block',
-              transition: 'width 0.1s ease-out',
-            }}
-            onError={() => setImgError('Could not load SVG from Cloudinary.')}
-          />
-        )}
+        <div
+          style={{
+            minWidth: '100%',
+            minHeight: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1.5rem',
+            boxSizing: 'border-box',
+          }}
+        >
+          {imgError ? null : (
+            <img
+              src={resource.url}
+              alt={resource.title}
+              onLoad={handleImageLoad}
+              onDoubleClick={handleDoubleClick}
+              style={dimensions ? {
+                width: `${dimensions.width * scale}px`,
+                height: `${dimensions.height * scale}px`,
+                display: 'block',
+                transition: 'width 0.1s ease-out, height 0.1s ease-out',
+                userSelect: 'none',
+                maxWidth: 'none',
+              } : {
+                maxWidth: '100%',
+                maxHeight: '100%',
+                display: 'block',
+              }}
+              onError={() => setImgError('Could not load SVG from Cloudinary.')}
+            />
+          )}
+        </div>
       </div>
+
       {imgError && (
         <div className={communityToastWarn + ' rounded-lg px-3 py-2 text-xs'}>
           <p>Inline preview unavailable: {imgError}</p>
@@ -565,6 +784,112 @@ function SvgRow({ resource, completed, onComplete }: RowProps): React.ReactEleme
             Open SVG in new tab
           </a>
         </div>
+      )}
+
+      {/* Fullscreen Overlay Modal */}
+      {isExpanded && createPortal(
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[9999] flex flex-col p-4 md:p-6 select-none">
+          {/* Header */}
+          <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-4">
+            <div>
+              <h3 className="text-lg font-semibold text-white">{resource.title}</h3>
+              <p className="text-xs text-zinc-400">Drag to pan · Double-click to zoom · Scroll to zoom</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5 bg-white/5 rounded-lg border border-white/10 p-1">
+                <button
+                  type="button"
+                  onClick={() => setScale((s) => Math.max(0.1, s / 1.15))}
+                  className="p-1.5 hover:bg-white/10 rounded text-zinc-300 hover:text-white transition-colors"
+                  title="Zoom Out"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                </button>
+                <span className="text-xs font-mono text-zinc-300 w-12 text-center select-none">
+                  {Math.round(scale * 100)}%
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setScale((s) => Math.min(8, s * 1.15))}
+                  className="p-1.5 hover:bg-white/10 rounded text-zinc-300 hover:text-white transition-colors"
+                  title="Zoom In"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={fitWidth}
+                className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs font-medium text-zinc-300 hover:bg-white/10 hover:text-white transition-all active:scale-95"
+              >
+                Fit Width
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsExpanded(false)}
+                className="p-2 bg-white/10 hover:bg-red-500/20 hover:text-red-400 rounded-full text-zinc-300 transition-all active:scale-95"
+                title="Close Fullscreen"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Canvas */}
+          <div
+            ref={expandedContainerRef}
+            className="flex-1 w-full bg-zinc-950/60 rounded-xl border border-white/10 overflow-auto relative select-none flex items-center justify-center"
+            style={{
+              cursor: isDragging ? 'grabbing' : 'grab',
+              backgroundImage: 'radial-gradient(rgba(255, 255, 255, 0.08) 1.2px, transparent 0)',
+              backgroundSize: '20px 20px',
+            }}
+            onPointerDown={(e) => onPointerDownGeneric(e, expandedContainerRef)}
+            onPointerMove={(e) => onPointerMoveGeneric(e, expandedContainerRef)}
+            onPointerUp={(e) => onPointerUpGeneric(e, expandedContainerRef)}
+            onPointerCancel={(e) => onPointerUpGeneric(e, expandedContainerRef)}
+          >
+            <div
+              style={{
+                minWidth: '100%',
+                minHeight: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '2rem',
+                boxSizing: 'border-box',
+              }}
+            >
+              <img
+                src={resource.url}
+                alt={resource.title}
+                onDoubleClick={handleDoubleClick}
+                style={dimensions ? {
+                  width: `${dimensions.width * scale}px`,
+                  height: `${dimensions.height * scale}px`,
+                  display: 'block',
+                  transition: 'width 0.1s ease-out, height 0.1s ease-out',
+                  userSelect: 'none',
+                  maxWidth: 'none',
+                } : {
+                  maxWidth: '100%',
+                  maxHeight: '100%',
+                  display: 'block',
+                }}
+                onError={() => setImgError('Could not load SVG.')}
+              />
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
