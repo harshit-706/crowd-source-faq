@@ -73,9 +73,13 @@ export function getModelForProvider(model: string, provider: AIProvider, fallbac
     openai: 'gpt-4o-mini',
     xai: 'grok-3',
     minimax: 'MiniMax-Text-01',
-    gemini: 'gemini-1.5-flash',
+    gemini: 'gemini-3.5-flash',
     custom: '',
   };
+
+  if (model === 'gemini-1.5-flash' || model === 'gemini-2.5-flash') {
+    model = 'gemini-3.5-flash';
+  }
 
   const lowerModel = model.toLowerCase();
   let modelProvider: AIProvider | null = null;
@@ -192,7 +196,7 @@ const DEFAULT_MODELS: Record<AIProvider, string> = {
   openai: 'gpt-4o-mini',
   xai: 'grok-3',
   minimax: 'MiniMax-Text-01',
-  gemini: 'gemini-1.5-flash',
+  gemini: 'gemini-2.5-flash',
   custom: '',
 };
 

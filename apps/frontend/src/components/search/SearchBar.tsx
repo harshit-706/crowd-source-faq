@@ -155,7 +155,7 @@ const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(function Se
 
     if (rewriteDebounceRef.current) clearTimeout(rewriteDebounceRef.current);
     if (val.trim().length >= 4) {
-      rewriteDebounceRef.current = setTimeout(() => fetchRewrite(val), 500);
+      rewriteDebounceRef.current = setTimeout(() => fetchRewrite(val), 800);
     } else {
       setRewriteSuggestion(null);
     }

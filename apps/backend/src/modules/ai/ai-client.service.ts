@@ -172,12 +172,14 @@ export class AiClient {
     if (process.env.ANTHROPIC_API_KEY) return process.env.ANTHROPIC_API_KEY;
     if (process.env.OPENAI_API_KEY) return process.env.OPENAI_API_KEY;
     if (process.env.XAI_API_KEY) return process.env.XAI_API_KEY;
+    if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY;
     if (process.env.MINIMAX_API_KEY) return process.env.MINIMAX_API_KEY;
     throw new Error(
       'No AI API key configured. Set one of:\n' +
       '  ANTHROPIC_API_KEY — https://console.anthropic.com/settings/keys\n' +
       '  OPENAI_API_KEY   — https://platform.openai.com/api-keys\n' +
       '  XAI_API_KEY      — https://console.x.ai/\n' +
+      '  GEMINI_API_KEY   — https://aistudio.google.com/app/apikey\n' +
       '  MINIMAX_API_KEY  — https://platform.minimax.io'
     );
   }
@@ -186,6 +188,7 @@ export class AiClient {
     if (process.env.ANTHROPIC_API_KEY) return 'anthropic';
     if (process.env.OPENAI_API_KEY) return 'openai';
     if (process.env.XAI_API_KEY) return 'xai';
+    if (process.env.GEMINI_API_KEY) return 'gemini';
     return 'minimax';
   }
 
@@ -207,7 +210,7 @@ export class AiClient {
       openai: 'gpt-4o-mini',
       xai: 'grok-3',
       minimax: 'MiniMax-Text-01',
-      gemini: 'gemini-1.5-flash',
+      gemini: 'gemini-3.5-flash',
       custom: '',
     };
     return defaults[this.provider];
@@ -498,12 +501,12 @@ Output shape: {"rewritten": "...", "changed": true|false}`;
           { role: 'user', content: userContent },
         ],
         'queryRewrite',
-        { temperature: 0.2, maxTokens: 150 }
+        { temperature: 0.2, maxTokens: 1024 }
       );
       return parseRewriteResponse(result.content, trimmed);
     } catch (err) {
       logger.warn(`[aiClient] rewriteQuery failed, falling back to original query: ${(err as Error).message}`);
-      return { original: trimmed, rewritten: trimmed, changed: false };
+      return { original: trimmed, rewritten: `ERROR: ${(err as Error).message}`, changed: false };
     }
   }
 

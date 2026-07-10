@@ -37,7 +37,7 @@ router.post('/', programScope({ required: false }), semanticSearch);
 
 const rewriteLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 20,
+  max: 200,
   message: 'Too many rewrite requests, please try again after a minute',
   standardHeaders: true,
   legacyHeaders: false,
