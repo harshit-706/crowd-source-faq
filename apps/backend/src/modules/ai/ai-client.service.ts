@@ -17,6 +17,7 @@ import AiConfig, { type IProviderKey } from './ai-config.model.js';
 import { generateQueryEmbedding } from '../../utils/ai/embeddings.js';
 import { logAiApiSuccess, logAiApiFailure } from '../../utils/ai/apiUsageLog.js';
 import { logger } from '../../utils/http/logger.js';
+import { stripAllWrappers, extractJsonSubstring } from '../../utils/ai/aiResponseParsers.js';
 import { decrypt } from '../../utils/auth/crypto.js';
 
 // v1.83 — in-memory unhealthy key tracker. Mirrors the same
@@ -171,7 +172,8 @@ export type AIFeature =
   | 'knowledgeExtraction'
   | 'searchSummarization'
   | 'faqGeneration'
-  | 'firstResponder';
+  | 'firstResponder'
+  | 'queryRewrite';
 
 export interface AIResult {
   content: string;
@@ -204,6 +206,12 @@ export interface DuplicateMatch {
   _id: string;
   score: number;
   reason: string;
+}
+
+export interface RewriteQueryResult {
+  original: string;
+  rewritten: string;
+  changed: boolean;
 }
 
 // ─── Cost constants (approximate per-provider pricing per 1M tokens) ──────────
@@ -239,12 +247,14 @@ export class AiClient {
     if (process.env.ANTHROPIC_API_KEY) return process.env.ANTHROPIC_API_KEY;
     if (process.env.OPENAI_API_KEY) return process.env.OPENAI_API_KEY;
     if (process.env.XAI_API_KEY) return process.env.XAI_API_KEY;
+    if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY;
     if (process.env.MINIMAX_API_KEY) return process.env.MINIMAX_API_KEY;
     throw new Error(
       'No AI API key configured. Set one of:\n' +
       '  ANTHROPIC_API_KEY — https://console.anthropic.com/settings/keys\n' +
       '  OPENAI_API_KEY   — https://platform.openai.com/api-keys\n' +
       '  XAI_API_KEY      — https://console.x.ai/\n' +
+      '  GEMINI_API_KEY   — https://aistudio.google.com/app/apikey\n' +
       '  MINIMAX_API_KEY  — https://platform.minimax.io'
     );
   }
@@ -253,6 +263,7 @@ export class AiClient {
     if (process.env.ANTHROPIC_API_KEY) return 'anthropic';
     if (process.env.OPENAI_API_KEY) return 'openai';
     if (process.env.XAI_API_KEY) return 'xai';
+    if (process.env.GEMINI_API_KEY) return 'gemini';
     return 'minimax';
   }
 
@@ -274,7 +285,7 @@ export class AiClient {
       openai: 'gpt-4o-mini',
       xai: 'grok-3',
       minimax: 'MiniMax-Text-01',
-      gemini: 'gemini-1.5-flash',
+      gemini: 'gemini-3.5-flash',
       custom: '',
     };
     return defaults[this.provider];
@@ -865,6 +876,38 @@ Summaries should be no longer than ${maxLen} words.`;
     return result.content;
   }
 
+  async rewriteQuery(query: string): Promise<RewriteQueryResult> {
+    const trimmed = query.trim();
+    if (!trimmed) {
+      return { original: query, rewritten: query, changed: false };
+    }
+
+    const systemPrompt = `You rewrite unclear or poorly-worded search queries for an internal FAQ/Q&A portal into a single, clear, well-formed question that is easier to match against a knowledge base.
+Rules:
+- Preserve the original meaning and intent. Never invent new topics or add information that wasn't implied.
+- Fix typos, grammar, and vague phrasing. Expand obvious abbreviations.
+- If the query is already clear, return it unchanged and set "changed" to false.
+- Answer ONLY with a valid JSON object. No preamble, no markdown fences.
+Output shape: {"rewritten": "...", "changed": true|false}`;
+
+    const userContent = `Query: "${trimmed.replace(/"/g, "'")}"`;
+
+    try {
+      const result = await this.chat(
+        [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userContent },
+        ],
+        'queryRewrite',
+        { temperature: 0.2, maxTokens: 1024 }
+      );
+      return parseRewriteResponse(result.content, trimmed);
+    } catch (err) {
+      logger.warn(`[aiClient] rewriteQuery failed, falling back to original query: ${(err as Error).message}`);
+      return { original: trimmed, rewritten: `ERROR: ${(err as Error).message}`, changed: false };
+    }
+  }
+
   // ─── Feature: Knowledge extraction ───────────────────────────────────────
 
   /**
@@ -1039,6 +1082,23 @@ function parseDuplicateResponse(
   } catch (err) {
     logger.warn(`[aiClient] Failed to parse duplicate response JSON: ${(err as Error).message}. Raw response: ${raw.slice(0, 300)}`);
     return [];
+  }
+}
+
+function parseRewriteResponse(raw: string, original: string): RewriteQueryResult {
+  try {
+    const clean = stripAllWrappers(raw);
+    const jsonStr = extractJsonSubstring(clean) ?? clean;
+    const parsed = JSON.parse(jsonStr) as { rewritten?: unknown; changed?: unknown };
+    const rewritten =
+      typeof parsed.rewritten === 'string' && parsed.rewritten.trim()
+        ? parsed.rewritten.trim()
+        : original;
+    const changed = rewritten.toLowerCase() !== original.toLowerCase();
+    return { original, rewritten, changed };
+  } catch (err) {
+    logger.warn(`[aiClient] Failed to parse rewrite response JSON: ${(err as Error).message}. Raw response: ${raw.slice(0, 300)}`);
+    return { original, rewritten: original, changed: false };
   }
 }
 
