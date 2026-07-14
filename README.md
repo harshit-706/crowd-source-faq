@@ -91,6 +91,13 @@ No new database collections were introduced — this feature reads existing
 
 ---
 
+## daily streak
+- Users now build a daily streak by taking any point-earning action (posting, being upvoted, getting an answer accepted)
+- Streak increments once per calendar day, resets to 1 if a day is missed, tracks a personal longest-streak record
+- A daily scheduled job resets streaks for users who missed a day, since streak-breaking can't rely only on login-triggered writes
+- Streak is visible on the Account page (🔥 X day streak · best: Y)
+- New fields added to the User model: currentStreak, longestStreak, lastActiveDate
+
 ## Admin Dashboard
 
 The admin panel at `/admin` (mounted at `/api/admin/*`) provides telemetry, moderation, and operational control. Key areas:
