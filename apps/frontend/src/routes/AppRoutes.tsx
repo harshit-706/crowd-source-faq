@@ -33,6 +33,7 @@ const HomePage = lazy(() => import('../pages/HomePage'));
 const FAQPage = lazy(() => import('../pages/FAQPage'));
 const CommunityPage = lazy(() => import('../pages/CommunityPage'));
 const SavedKnowledgePage = lazy(() => import('../pages/SavedKnowledgePage'));
+const LearningJourneyPage = lazy(() => import('../pages/LearningJourneyPage'));
 const SupportIndexPage = lazy(() => import('../pages/SupportIndexPage'));
 const NewSupportRequestPage = lazy(() => import('../pages/NewSupportRequestPage'));
 const SupportTicketPage = lazy(() => import('../pages/SupportTicketPage'));
@@ -174,6 +175,12 @@ export default function AppRoutes() {
               path="/account"
               element={<RouteElement name="account"><AccountRoute>
                   <AccountPage />
+                </AccountRoute></RouteElement>}
+            />
+            <Route
+              path="/journey"
+              element={<RouteElement name="journey"><AccountRoute>
+                  <LearningJourneyPage />
                 </AccountRoute></RouteElement>}
             />
             <Route

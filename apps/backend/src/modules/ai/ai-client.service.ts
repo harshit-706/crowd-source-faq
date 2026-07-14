@@ -170,7 +170,8 @@ export type AIFeature =
   | 'duplicateDetection'
   | 'knowledgeExtraction'
   | 'searchSummarization'
-  | 'faqGeneration';
+  | 'faqGeneration'
+  | 'firstResponder';
 
 export interface AIResult {
   content: string;
@@ -323,6 +324,15 @@ export class AiClient {
           provider: 'openai',
           modelName: 'gpt-4o',
           tokensUsed: 50,
+          estimatedCost: 0,
+        };
+      }
+      if (feature === 'firstResponder') {
+        return {
+          content: JSON.stringify({ answer: 'This is a mock peer-tutor answer for testing.', confident: true }),
+          provider: 'openai',
+          modelName: 'gpt-4o',
+          tokensUsed: 60,
           estimatedCost: 0,
         };
       }
@@ -922,6 +932,38 @@ The answer should be direct and actionable. Do not add disclaimers.`;
     return parseFAQResponse(result.content);
   }
 
+  // ─── Feature: AI First Responder (peer-tutor Q&A) ─────────────────────────
+
+  /**
+   * Answer a student's question as a friendly peer tutor. Returns a
+   * structured {answer, confident} result — `confident: false` is the
+   * model's own signal that it doesn't actually know, which the caller
+   * (first-responder.controller.ts) uses to decide whether to escalate
+   * to a human admin instead of showing a made-up answer.
+   */
+  async answerAsPeerTutor(question: string): Promise<{ answer: string; confident: boolean }> {
+    const systemPrompt = `You are a friendly, knowledgeable peer tutor helping a fellow student on a Q&A learning platform.
+Explain things clearly and simply, the way a helpful senior student would — encouraging, not robotic or corporate.
+You must be honest about the limits of your knowledge: this is critical, because a wrong or made-up answer is worse than no answer.
+
+Rules:
+- If you are confident you know the correct answer, answer it directly and concisely (2-4 sentences, plain language, no unnecessary preamble).
+- If the question is ambiguous, outside your knowledge, specific to this organization's internal policy/process you have no context on, or you are not genuinely sure, do NOT guess or make something up.
+- Respond ONLY with a valid JSON object, no markdown, no code fences: {"answer": "...", "confident": true or false}
+- When unsure, set "confident": false and "answer" can be a short one-line acknowledgement (it will not be shown to the user).`;
+
+    const result = await this.chat(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: question.slice(0, 2000) },
+      ],
+      'firstResponder',
+      { temperature: 0.3, maxTokens: 400 }
+    );
+
+    return parsePeerTutorResponse(result.content);
+  }
+
   // ─── Vector pre-filter ─────────────────────────────────────────────────────
 
   /**
@@ -1046,6 +1088,26 @@ function parseFAQResponse(
   } catch (err) {
     logger.warn(`[aiClient] Failed to parse FAQ generation response JSON: ${(err as Error).message}. Raw response: ${raw.slice(0, 300)}`);
     return { question: '', answer: '', category: 'General', confidence: 0 };
+  }
+}
+
+function parsePeerTutorResponse(raw: string): { answer: string; confident: boolean } {
+  const clean = raw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+  const match = clean.match(/\{[\s\S]*\}/);
+  if (!match) {
+    // Malformed / non-JSON output — treat as "not confident" rather than
+    // guessing at intent. The caller escalates on confident === false.
+    logger.warn(`[aiClient] answerAsPeerTutor: no JSON object found in response. Raw: ${raw.slice(0, 200)}`);
+    return { answer: '', confident: false };
+  }
+  try {
+    const parsed = JSON.parse(match[0]) as Record<string, unknown>;
+    const answer = String(parsed.answer ?? '').trim();
+    const confident = parsed.confident === true && answer.length > 0;
+    return { answer, confident };
+  } catch (err) {
+    logger.warn(`[aiClient] answerAsPeerTutor: JSON parse failed: ${(err as Error).message}. Raw: ${raw.slice(0, 200)}`);
+    return { answer: '', confident: false };
   }
 }
 
